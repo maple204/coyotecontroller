@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Coyote Controller</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" href="icon-32.png" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+
+</head>
+<body>
+<div id="app">
+  <header id="header">
+    <div class="header-buttons">
+      <button id="connectPrimaryBtn" class="mode-btn">Connect Primary</button>
+      <button id="connectSecondaryBtn" class="mode-btn">Connect Secondary</button>
+      <button id="disconnectBtn" class="mode-btn">Disconnect</button>
+      <button id="monitorBtn" class="mode-btn">Monitor: Off</button>
+            <button id="modeBtn" class="mode-btn">Mode: Control</button>
+<button id="guideBtn" class="mode-btn">User Guide</button>
+    </div>
+  </header>
+
+  <main id="mainGrid">
+    <section id="controlsPanel" class="panel">
+      <section id="globalPanel" class="subpanel">
+        <div class="control-group" phaseControl>
+          <div class="label-row">
+            <label for="masterVol" class="click-reset" id="masterVolLabel">Master Volume <span id="masterVolVal">0%</span></label>
+          </div>
+          <input type="range" id="masterVol" min="0" max="1" step="0.01" value="0" />
+        </div>
+
+        <div class="control-group" phaseCycleControl>
+          <div class="label-row">
+            <label for="baseFreqSlider" class="click-reset" id="baseFreqLabel">Base Frequency <span id="baseFreqVal">200</span> Hz</label>
+          </div>
+          <input type="range" id="baseFreqSlider" min="0" max="1000" step="1" value="0" />
+          <!-- Hidden numeric input retained for JS compatibility -->
+          <input type="number" id="baseFreq" min="20" max="1500" value="200" class="visually-hidden-input" />
+        </div>
+      </section>
+<div class="channels">
+        <div class="channel ch1" id="channel1Box">
+          <div class="chHeaderRow">
+            <div class="chTitle ch1">Primary A (CH1)</div>
+            <div id="devBadge1" class="devBadge">Disconnected</div>
+          </div>
+          <div class="control-group" phaseControl>
+            <div class="label-row">
+              <label for="amp1" class="click-reset">Amplitude <span id="amp1Val">0%</span></label>
+              <button id="max_amp1" class="snap-pill max-pill" type="button">Max 0%</button>
+            </div>
+            <input type="range" id="amp1" min="0" max="1" step="0.01" value="0" />
+          </div>
+          <div class="control-group" phaseCycleControl>
+            <div class="label-row">
+              <label for="freqMultiplier1" class="click-reset">Frequency Multiplier <span id="mult1Val">1x</span></label>
+              <button id="snap_mult1" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="freqMultiplier1" min="1" max="6" step="0.01" value="1" />
+          </div>
+          <div class="control-group" phaseControl>
+            <div class="label-row">
+              <label for="phase1" class="click-reset">Phase <span id="phase1Val">0°</span></label>
+              <button id="snap_phase1" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phase1" min="0" max="360" step="1" value="0" />
+          </div>
+          <div class="control-group" phaseCycleControl>
+            <div class="label-row">
+              <label for="phaseCycle1" class="click-reset">Phase Cycle <span id="cycle1Val">0°/s</span></label>
+              <button id="snap_cycle1" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phaseCycle1" min="-360" max="360" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="channel ch2" id="channel2Box">
+          <div class="chHeaderRow">
+            <div class="chTitle ch2">Primary B (CH2)</div>
+            <div id="devBadge2" class="devBadge">Disconnected</div>
+          </div>
+          <div class="control-group" phaseControl>
+            <div class="label-row">
+              <label for="amp2" class="click-reset">Amplitude <span id="amp2Val">0%</span></label>
+              <button id="max_amp2" class="snap-pill max-pill" type="button">Max 0%</button>
+            </div>
+            <input type="range" id="amp2" min="0" max="1" step="0.01" value="0" />
+          </div>
+          <div class="control-group" phaseCycleControl>
+            <div class="label-row">
+              <label for="freqMultiplier2" class="click-reset">Frequency Multiplier <span id="mult2Val">1x</span></label>
+              <button id="snap_mult2" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="freqMultiplier2" min="1" max="6" step="0.01" value="1" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="phase2" class="click-reset">Phase <span id="phase2Val">0°</span></label>
+              <button id="snap_phase2" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phase2" min="0" max="360" step="1" value="0" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="phaseCycle2" class="click-reset">Phase Cycle <span id="cycle2Val">0°/s</span></label>
+              <button id="snap_cycle2" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phaseCycle2" min="-360" max="360" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="channel ch3" id="channel3Box">
+          <div class="chHeaderRow">
+            <div class="chTitle ch3">Secondary A (CH3)</div>
+            <div id="devBadge3" class="devBadge">Disconnected</div>
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="amp3" class="click-reset">Amplitude <span id="amp3Val">0%</span></label>
+              <button id="max_amp3" class="snap-pill max-pill" type="button">Max 0%</button>
+            </div>
+            <input type="range" id="amp3" min="0" max="1" step="0.01" value="0" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="freqMultiplier3" class="click-reset">Frequency Multiplier <span id="mult3Val">1x</span></label>
+              <button id="snap_mult3" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="freqMultiplier3" min="1" max="6" step="0.01" value="1" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="phase3" class="click-reset">Phase <span id="phase3Val">0°</span></label>
+              <button id="snap_phase3" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phase3" min="0" max="360" step="1" value="0" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="phaseCycle3" class="click-reset">Phase Cycle <span id="cycle3Val">0°/s</span></label>
+              <button id="snap_cycle3" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phaseCycle3" min="-360" max="360" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="channel ch4" id="channel4Box">
+          <div class="chHeaderRow">
+            <div class="chTitle ch4">Secondary B (CH4)</div>
+            <div id="devBadge4" class="devBadge">Disconnected</div>
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="amp4" class="click-reset">Amplitude <span id="amp4Val">0%</span></label>
+              <button id="max_amp4" class="snap-pill max-pill" type="button">Max 0%</button>
+            </div>
+            <input type="range" id="amp4" min="0" max="1" step="0.01" value="0" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="freqMultiplier4" class="click-reset">Frequency Multiplier <span id="mult4Val">1x</span></label>
+              <button id="snap_mult4" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="freqMultiplier4" min="1" max="6" step="0.01" value="1" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="phase4" class="click-reset">Phase <span id="phase4Val">0°</span></label>
+              <button id="snap_phase4" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phase4" min="0" max="360" step="1" value="0" />
+          </div>
+          <div class="control-group">
+            <div class="label-row">
+              <label for="phaseCycle4" class="click-reset">Phase Cycle <span id="cycle4Val">0°/s</span></label>
+              <button id="snap_cycle4" class="snap-pill on" type="button">Snap</button>
+            </div>
+            <input type="range" id="phaseCycle4" min="-360" max="360" step="1" value="0" />
+          </div>
+        </div>
+      </div>
+
+      <section id="scopePanel" class="subpanel scopeFrame"><canvas id="oscilloscope"></canvas></section>
+    </section>
+
+    <section id="rightPanel" class="panel">
+      <section id="vizPanel" class="subpanel visFrame">
+      <div class="square-wrap vis-pad" id="visPad">
+        <canvas id="fieldCanvas"></canvas>
+        <div class="vis-crosshair"></div>
+        <div id="visCursorFreq" class="vis-cursor vis-cursor-freq"></div>
+        <div id="visCursorAmp" class="vis-cursor vis-cursor-amp"></div>
+      </div>
+    </section>
+
+    <section id="biomePanel" class="subpanel biome-only">
+      <div class="biome-hud">
+        <div class="biome-hint">Use Feed buttons below.</div>
+      </div>
+      <div class="biome-controls">
+        <div class="biome-section-title">Feed</div>
+        <div class="biome-feed-list">
+          <button class="biome-feed-btn" data-nutrient="sugar"><span class="dot dot-sugar"></span>Sugar (Growth)</button>
+          <button class="biome-feed-btn" data-nutrient="salt"><span class="dot dot-salt"></span>Salt (Stability)</button>
+          <button class="biome-feed-btn" data-nutrient="iron"><span class="dot dot-iron"></span>Iron (Rhythm)</button>
+          <button class="biome-feed-btn" data-nutrient="water"><span class="dot dot-water"></span>Water (Blend)</button>
+          <button class="biome-feed-btn" data-nutrient="sulfur"><span class="dot dot-sulfur"></span>Sulfur (Spice)</button>
+          <button class="biome-feed-btn" data-nutrient="carbon"><span class="dot dot-carbon"></span>Carbon (Memory)</button>
+        </div>
+        <div class="biome-section-title">Caretaker</div>
+        <div class="biome-caretaker-row">
+          <select id="caretakerSelect" class="biome-select">
+            <option value="gardener">The Gardener</option>
+          </select>
+          <button id="caretakerBtn" class="mode-btn">Start</button>
+        </div>
+        <div class="slider-row">
+          <label class="slider-label">Caretaker Influence <span id="caretakerIntensityValInline">100%</span></label>
+          <input id="caretakerIntensity" type="range" min="0" max="200" value="100" />
+          <div class="value" id="caretakerIntensityVal">100%</div>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="touchPanel" class="subpanel">
+      <div class="panelTitle">Touch Controls</div>
+      <div class="touch-controls">
+        <div class="touch-row two touchPhaseControl">
+          <div class="half">
+            <label for="touchPhaseNeg">Touch Phase Shift (−) <span id="touchPhaseNegVal">0°</span></label>
+            <input id="touchPhaseNeg" class="neg-slider" type="range" min="0" max="360" step="1" value="0" />
+          </div>
+          <div class="half">
+            <label for="touchPhasePos">Touch Phase Shift (+) <span id="touchPhasePosVal">0°</span></label>
+            <input id="touchPhasePos" type="range" min="0" max="360" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="touch-row two">
+          <div class="half">
+            <label for="touchFreqNeg">Touch Frequency Shift (−) <span id="touchFreqNegVal">0.00x</span></label>
+            <input id="touchFreqNeg" class="neg-slider" type="range" min="0" max="4" step="0.01" value="2.00" />
+          </div>
+          <div class="half">
+            <label for="touchFreqPos">Touch Frequency Shift (+) <span id="touchFreqPosVal">0.00x</span></label>
+            <input id="touchFreqPos" type="range" min="0" max="4" step="0.01" value="2.00" />
+          </div>
+        </div>
+
+        <div class="touch-row toggles">
+          <label class="toggle">
+            <input id="touchFreqInvert" type="checkbox" />
+            <span>Invert Freq (closer = lower)</span>
+          </label>
+        </div>
+
+        <div class="touch-row two">
+          <div class="half">
+            <label for="touchAmpLow">Touch Amp Away <span id="touchAmpLowVal">0%</span></label>
+            <input id="touchAmpLow" class="neg-slider" type="range" min="0" max="100" step="1" value="50" />
+          </div>
+          <div class="half">
+            <label for="touchAmpHigh">Touch Amp Toward <span id="touchAmpHighVal">100%</span></label>
+            <input id="touchAmpHigh" type="range" min="100" max="200" step="1" value="150" />
+          </div>
+        </div>
+
+        <div class="touch-row toggles">
+          <label class="toggle">
+            <input id="touchAmpInvert" type="checkbox" />
+            <span>Invert Amp (closer = lower)</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section id="motionPanel" class="subpanel">
+      <div class="motion-top">
+        <div class="motion-label">Scripts</div>
+        <div class="motion-controls">
+          <select id="scriptSelect"></select>
+          <button id="scriptToggleBtn" class="mode-btn start-btn" type="button">Start</button>
+        </div>
+      </div>
+
+      <div class="motion-row">
+        <label for="scriptIntensity">Script Intensity <span id="scriptIntensityVal">100%</span></label>
+        <input id="scriptIntensity" type="range" min="0" max="200" step="1" value="100" />
+      </div>
+    </section>
+    </section>
+  </main>
+</div>
+
+
+<dialog id="safetyDialog">
+  <h3 class="dlg-title">Important Safety Notice</h3>
+  <div class="dlg-text" style="line-height:1.35;">
+    <p><strong>Adult use only.</strong> This software controls electronic stimulation devices. Improper use can cause injury.</p>
+    <p>Use at your own risk. You are solely responsible for how you configure and operate your devices, including intensity, electrode placement, and session duration.</p>
+    <p><strong>No medical advice.</strong> Do not use if you have a pacemaker/implanted device, heart conditions, epilepsy, are pregnant, under the influence, have broken/irritated skin at contact points, or any condition where electrical stimulation may be unsafe. Stop immediately if you feel pain, dizziness, numbness, burns, or discomfort.</p>
+    <p><strong>No warranty / limitation of liability.</strong> This software is provided “AS IS”, without warranties of any kind. The authors/distributors are not liable for any damages or injuries arising from use.</p>
+    <p><strong>Safety caps.</strong> Output will not start until you set at least one channel <em>Max</em> above 0%. Keep Max values conservative.</p>
+  </div>
+  <div class="dlg-actions">
+    <button id="safetyAccept" class="mode-btn">I Understand</button>
+    <button id="safetyExit" class="mode-btn">Exit</button>
+  </div>
+</dialog>
+
+<dialog id="guideDialog">
+  <h3 class="dlg-title">User Guide</h3>
+  <div class="dlg-text" style="line-height:1.4;">
+    <p><strong>Getting started</strong></p>
+    <ol>
+      <li>Click <strong>Connect Primary</strong> to pair the first device (controls CH1/CH2). Click <strong>Connect Secondary</strong> to pair the second device (controls CH3/CH4).</li>
+      <li>Set a <strong>Max</strong> limit for each channel you plan to use. Output is safety‑gated: <strong>no signal will start until at least one channel Max is above 0%</strong>.</li>
+      <li>Bring up <strong>Master Volume</strong> slowly. Use <strong>STOP</strong> to immediately set Master to 0 and center the touch cursors.</li>
+      <li>Optionally toggle <strong>Monitor</strong> to hear a preview mix in your speakers/headphones.</li>
+    </ol>
+
+    <p><strong>Channel controls</strong></p>
+    <ul>
+      <li><strong>Amplitude</strong> is the “trim” inside the safety cap. The actual output is bounded by the channel’s <strong>Max</strong>.</li>
+      <li><strong>Frequency Multiplier</strong> scales the base frequency per channel.</li>
+      <li><strong>Phase</strong> offsets a channel relative to the others.</li>
+      <li><strong>Phase Cycle</strong> continuously rotates a channel’s phase over time.</li>
+    </ul>
+
+    <p><strong>Touch / Vis pad</strong></p>
+    <ul>
+      <li>The pad controls two “sticks”: one biases <strong>frequency/phase</strong>, the other biases <strong>amplitude</strong>.</li>
+      <li>Drag to steer the effect toward corners (channels). Release to ease back to center.</li>
+    </ul>
+
+    <p><strong>Motion scripts</strong></p>
+    <ul>
+      <li>Select a script and press <strong>Start</strong> to animate the pad automatically.</li>
+      <li><strong>Script Intensity</strong> scales how far the motion reaches. Keep Max caps conservative.</li>
+      <li>Press <strong>Stop</strong> (script) to return control to you.</li>
+    </ul>
+
+    <p><strong>Game controller (standard Gamepad API)</strong></p>
+    <ul>
+      <li><strong>Right stick</strong>: frequency/phase pad</li>
+      <li><strong>Left stick</strong>: amplitude pad</li>
+      <li><strong>Start</strong>: STOP (master to 0)</li>
+      <li><strong>L1/R1</strong>: nudge Master down/up</li>
+      <li><strong>L2/R2</strong>: nudge Base Frequency down/up</li>
+      <li><strong>X / Y / A / B</strong>: select active channel (your build swaps X↔Y and A↔B to target opposite channels)</li>
+      <li><strong>D‑pad</strong>: adjust selected channel (Up/Down amplitude, Left/Right multiplier)</li>
+      <li><strong>Paddles</strong> (or L3/R3 fallback): nudge phase left/right</li>
+    </ul>
+
+    <p><strong>Tips</strong></p>
+    <ul>
+      <li>Start low, increase slowly, and set Max caps first.</li>
+      <li>Disconnect devices in-app before powering them off (recommended).</li>
+    </ul>
+  </div>
+  <div class="dlg-actions">
+    <button id="guideClose" class="mode-btn">Close</button>
+  </div>
+</dialog>
+<dialog id="maxDialog">
+  <h3 class="dlg-title">Set Channel Max Limit</h3>
+  <div class="dlg-text" id="maxDialogLabel">Max for CH?</div>
+  <input type="range" id="maxSlider" min="0" max="100" step="1" value="0" />
+  <div id="maxVal" class="dlg-value">0%</div>
+  <div class="dlg-actions">
+    <button id="maxOk" class="mode-btn">OK</button>
+    <button id="maxCancel" class="mode-btn">Cancel</button>
+  </div>
+</dialog>
+
+<div id="debugOverlay"></div>
+
+<script>
+(function(){
+  const safety = document.getElementById('safetyDialog');
+  const accept = document.getElementById('safetyAccept');
+  const exitBtn = document.getElementById('safetyExit');
+  const guideBtn = document.getElementById('guideBtn');
+  const guide = document.getElementById('guideDialog');
+  const guideClose = document.getElementById('guideClose');
+
+  function safeShow(dlg){
+    if (!dlg) return;
+    try { if (!dlg.open) dlg.showModal(); } catch(e) { /* ignore */ }
+  }
+  function safeClose(dlg){
+    if (!dlg) return;
+    try { if (dlg.open) dlg.close(); } catch(e) { /* ignore */ }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    // One-time safety notice per browser profile
+    const KEY = 'coyote.safetyAccepted.v1';
+    const accepted = localStorage.getItem(KEY) === '1';
+    if (!accepted) safeShow(safety);
+  });
+
+  accept && accept.addEventListener('click', () => {
+    localStorage.setItem('coyote.safetyAccepted.v1', '1');
+    safeClose(safety);
+  });
+
+  exitBtn && exitBtn.addEventListener('click', () => {
+    // Try to close the app window (works in Chrome app-mode). If blocked, at least close dialog.
+    try { window.close(); } catch(e) {}
+    safeClose(safety);
+  });
+
+  guideBtn && guideBtn.addEventListener('click', () => safeShow(guide));
+  guideClose && guideClose.addEventListener('click', () => safeClose(guide));
+
+  // Allow Escape to close guide (not safety)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') safeClose(guide);
+  });
+})();
+</script>
+  <!-- Move the STOP button here, and ONLY load the scripts once -->
+  <button id="stopBtn" class="mode-btn stop-btn">STOP</button>
+  <script src="biome_engine.js?v=5"></script>
+  <script src="main.js?v=200"></script>
+</body>
+</html>

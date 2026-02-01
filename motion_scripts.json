@@ -1,0 +1,380 @@
+{
+  "version": 4,
+  "notes": "Strict seamless-loop scripts. All parametric expressions use only sin/cos of 2*pi*n*t with integer n (and periodic envelopes), guaranteeing start=end. Dual-stick supported: x/y (freq/phase dot), ax/ay (amp dot). Includes calm, medium, and wild experiences plus pseudo-random harmonic blends that still loop perfectly.",
+  "scripts": [
+    {
+      "id": "gardener",
+      "type": "caretaker",
+      "label": "Newton",
+      "duration_s": 9999,
+      "loop": true
+    },
+    {
+      "id": "bloom",
+      "type": "caretaker",
+      "label": "Curie",
+      "duration_s": 9999,
+      "loop": true
+    },
+    {
+      "id": "ballast",
+      "type": "caretaker",
+      "label": "Faraday",
+      "duration_s": 9999,
+      "loop": true
+    },
+    {
+      "id": "ironbeat",
+      "type": "caretaker",
+      "label": "Feynman",
+      "duration_s": 9999,
+      "loop": true
+    },
+    {
+      "id": "sulfuric",
+      "type": "caretaker",
+      "label": "Darwin",
+      "duration_s": 9999,
+      "loop": true
+    },
+    {
+      "id": "drifter",
+      "type": "caretaker",
+      "label": "Gauss",
+      "duration_s": 9999,
+      "loop": true
+    },
+    {
+      "id": "circle",
+      "label": "Circle",
+      "type": "parametric",
+      "duration_s": 12.0,
+      "loop": true,
+      "params": {
+        "x": "0.5*cos(2*pi*1*t)",
+        "y": "0.5*sin(2*pi*1*t)"
+      }
+    },
+    {
+      "id": "figure8",
+      "label": "Figure 8",
+      "type": "parametric",
+      "duration_s": 14.0,
+      "loop": true,
+      "params": {
+        "x": "0.5*sin(2*pi*1*t)",
+        "y": "0.5*sin(2*pi*2*t)"
+      }
+    },
+    {
+      "id": "square",
+      "label": "Square",
+      "type": "keyframes",
+      "duration_s": 16.0,
+      "loop": true,
+      "interp": "smoothstep",
+      "keyframes": [
+        {
+          "t": 0.0,
+          "x": 0.0,
+          "y": -0.5
+        },
+        {
+          "t": 0.25,
+          "x": 0.5,
+          "y": 0.0
+        },
+        {
+          "t": 0.5,
+          "x": 0.0,
+          "y": 0.5
+        },
+        {
+          "t": 0.75,
+          "x": -0.5,
+          "y": 0.0
+        },
+        {
+          "t": 1.0,
+          "x": 0.0,
+          "y": -0.5
+        }
+      ]
+    },
+    {
+      "id": "triangle",
+      "label": "Triangle",
+      "type": "keyframes",
+      "duration_s": 15.0,
+      "loop": true,
+      "interp": "smoothstep",
+      "keyframes": [
+        {
+          "t": 0.0,
+          "x": 0.0,
+          "y": -0.5
+        },
+        {
+          "t": 0.333,
+          "x": 0.433,
+          "y": 0.25
+        },
+        {
+          "t": 0.666,
+          "x": -0.433,
+          "y": 0.25
+        },
+        {
+          "t": 1.0,
+          "x": 0.0,
+          "y": -0.5
+        }
+      ]
+    },
+    {
+      "id": "spiral",
+      "label": "Spiral (4 Out / 4 In)",
+      "type": "parametric",
+      "duration_s": 32.0,
+      "loop": true,
+      "params": {
+        "x": "0.5*(1-abs(2*t-1))*cos(2*pi*8*t)",
+        "y": "0.5*(1-abs(2*t-1))*sin(2*pi*8*t)"
+      }
+    },
+    {
+      "id": "veil_of_stars",
+      "label": "Veil of Stars (calm drift, amp halo)",
+      "type": "parametric",
+      "duration_s": 180.0,
+      "loop": true,
+      "params": {
+        "x": "0.34*cos(2*pi*1*t) + 0.07*cos(2*pi*5*t + 1.1)",
+        "y": "0.34*sin(2*pi*1*t) + 0.07*sin(2*pi*4*t + 0.6)",
+        "ax": "0.22*cos(2*pi*1*t + 0.9)",
+        "ay": "0.22*sin(2*pi*1*t + 0.2)"
+      }
+    },
+    {
+      "id": "quiet_breath",
+      "label": "Quiet Breath (expansion/contraction, amp opposite)",
+      "type": "parametric",
+      "duration_s": 210.0,
+      "loop": true,
+      "params": {
+        "x": "(0.14 + 0.30*(0.5-0.5*cos(2*pi*1*t)))*cos(2*pi*1*t)",
+        "y": "(0.14 + 0.30*(0.5-0.5*cos(2*pi*1*t)))*sin(2*pi*1*t)",
+        "ax": "(0.12 + 0.22*(0.5-0.5*cos(2*pi*1*t)))*cos(2*pi*1*t + pi)",
+        "ay": "(0.12 + 0.22*(0.5-0.5*cos(2*pi*1*t)))*sin(2*pi*1*t + pi)"
+      }
+    },
+    {
+      "id": "moonlace",
+      "label": "Moonlace (slow petals, amp draws a small rose)",
+      "type": "parametric",
+      "duration_s": 150.0,
+      "loop": true,
+      "params": {
+        "x": "0.42*cos(2*pi*1*t)*(0.65 + 0.35*cos(2*pi*3*t))",
+        "y": "0.42*sin(2*pi*1*t)*(0.65 + 0.35*cos(2*pi*3*t))",
+        "ax": "0.24*cos(2*pi*2*t)*(0.70 + 0.30*cos(2*pi*5*t))",
+        "ay": "0.24*sin(2*pi*2*t)*(0.70 + 0.30*cos(2*pi*5*t))"
+      }
+    },
+    {
+      "id": "twin_orbits",
+      "label": "Twin Orbits (in/out of sync illusion, long)",
+      "type": "parametric",
+      "duration_s": 180.0,
+      "loop": true,
+      "params": {
+        "x": "0.46*cos(2*pi*1*t)",
+        "y": "0.46*sin(2*pi*1*t)",
+        "ax": "0.33*cos(2*pi*1*t + 0.9) + 0.07*cos(2*pi*7*t)",
+        "ay": "0.33*sin(2*pi*1*t + 0.9) + 0.07*sin(2*pi*11*t)"
+      }
+    },
+    {
+      "id": "corner_waltz",
+      "label": "Corner Waltz (corners vs curves, seamless keyframes)",
+      "type": "keyframes",
+      "duration_s": 75.0,
+      "loop": true,
+      "interp": "smoothstep",
+      "keyframes": [
+        {
+          "t": 0.0,
+          "x": 0.42,
+          "y": 0.42,
+          "ax": 0.0,
+          "ay": 0.0
+        },
+        {
+          "t": 0.2,
+          "x": 0.1,
+          "y": 0.34,
+          "ax": -0.22,
+          "ay": 0.1
+        },
+        {
+          "t": 0.4,
+          "x": -0.42,
+          "y": 0.42,
+          "ax": 0.22,
+          "ay": -0.1
+        },
+        {
+          "t": 0.6,
+          "x": -0.12,
+          "y": -0.34,
+          "ax": 0.1,
+          "ay": 0.22
+        },
+        {
+          "t": 0.8,
+          "x": 0.42,
+          "y": -0.42,
+          "ax": -0.1,
+          "ay": -0.22
+        },
+        {
+          "t": 1.0,
+          "x": 0.42,
+          "y": 0.42,
+          "ax": 0.0,
+          "ay": 0.0
+        }
+      ]
+    },
+    {
+      "id": "pulse_gate",
+      "label": "Pulse Gate (slow \u2192 fast \u2192 slow, perfectly periodic)",
+      "type": "parametric",
+      "duration_s": 150.0,
+      "loop": true,
+      "params": {
+        "x": "(0.18 + 0.30*(0.5-0.5*cos(2*pi*1*t))) * cos(2*pi*(1*t + 6*(0.5-0.5*cos(2*pi*1*t))*t))",
+        "y": "(0.18 + 0.30*(0.5-0.5*cos(2*pi*1*t))) * sin(2*pi*(1*t + 6*(0.5-0.5*cos(2*pi*1*t))*t))",
+        "ax": "0.26*cos(2*pi*1*t + 0.4)",
+        "ay": "0.26*sin(2*pi*1*t + 1.0)"
+      }
+    },
+    {
+      "id": "double_helix",
+      "label": "Double Helix (amp counter-chase, lively)",
+      "type": "parametric",
+      "duration_s": 120.0,
+      "loop": true,
+      "params": {
+        "x": "0.44*cos(2*pi*1*t) + 0.08*cos(2*pi*9*t + 0.7)",
+        "y": "0.44*sin(2*pi*1*t) + 0.08*sin(2*pi*9*t + 0.7)",
+        "ax": "0.44*cos(2*pi*1*t + pi) + 0.08*cos(2*pi*9*t)",
+        "ay": "0.44*sin(2*pi*1*t + pi) + 0.08*sin(2*pi*9*t)"
+      }
+    },
+    {
+      "id": "oracle_lattice",
+      "label": "Oracle Lattice (predictable harmonograph grid)",
+      "type": "parametric",
+      "duration_s": 180.0,
+      "loop": true,
+      "params": {
+        "x": "0.44*(sin(2*pi*3*t) + 0.33*sin(2*pi*5*t + 0.9))/1.33",
+        "y": "0.44*(sin(2*pi*4*t + 0.4) + 0.33*sin(2*pi*7*t + 2.2))/1.33",
+        "ax": "0.30*sin(2*pi*2*t + 0.8)",
+        "ay": "0.30*sin(2*pi*3*t + 1.6)"
+      }
+    },
+    {
+      "id": "stormglass",
+      "label": "Stormglass (high energy, still bounded)",
+      "type": "parametric",
+      "duration_s": 90.0,
+      "loop": true,
+      "params": {
+        "x": "0.30*sin(2*pi*3*t) + 0.15*sin(2*pi*11*t + 0.3) + 0.07*sin(2*pi*23*t + 1.2)",
+        "y": "0.30*sin(2*pi*2*t + 1.2) + 0.15*sin(2*pi*13*t + 0.8) + 0.07*sin(2*pi*19*t + 0.4)",
+        "ax": "0.26*sin(2*pi*2*t + 0.9) + 0.10*sin(2*pi*17*t + 0.2)",
+        "ay": "0.26*sin(2*pi*2*t + 0.1) + 0.10*sin(2*pi*15*t + 1.0)"
+      }
+    },
+    {
+      "id": "shard_dance",
+      "label": "Shard Dance (sharp petals, amp glides)",
+      "type": "parametric",
+      "duration_s": 105.0,
+      "loop": true,
+      "params": {
+        "x": "0.46*cos(2*pi*1*t)*(0.62 + 0.38*cos(2*pi*8*t))",
+        "y": "0.46*sin(2*pi*1*t)*(0.62 + 0.38*cos(2*pi*8*t))",
+        "ax": "0.24*cos(2*pi*1*t + 0.7) + 0.06*cos(2*pi*5*t)",
+        "ay": "0.24*sin(2*pi*1*t + 0.2) + 0.06*sin(2*pi*7*t)"
+      }
+    },
+    {
+      "id": "pseudo_random_mist",
+      "label": "Pseudo-Random Mist (unpredictable but loops)",
+      "type": "parametric",
+      "duration_s": 180.0,
+      "loop": true,
+      "params": {
+        "x": "0.26*sin(2*pi*3*t + 0.11) + 0.15*sin(2*pi*5*t + 1.73) + 0.10*sin(2*pi*7*t + 2.41) + 0.07*sin(2*pi*11*t + 0.62)",
+        "y": "0.26*sin(2*pi*4*t + 2.02) + 0.15*sin(2*pi*6*t + 0.47) + 0.10*sin(2*pi*9*t + 1.88) + 0.07*sin(2*pi*13*t + 2.77)",
+        "ax": "0.20*sin(2*pi*2*t + 1.14) + 0.12*sin(2*pi*8*t + 2.63) + 0.07*sin(2*pi*17*t + 0.31)",
+        "ay": "0.20*sin(2*pi*3*t + 0.52) + 0.12*sin(2*pi*7*t + 1.91) + 0.07*sin(2*pi*19*t + 2.10)"
+      }
+    },
+    {
+      "id": "pseudo_random_embers",
+      "label": "Pseudo-Random Embers (sparkle, higher energy)",
+      "type": "parametric",
+      "duration_s": 120.0,
+      "loop": true,
+      "params": {
+        "x": "0.22*sin(2*pi*5*t + 0.32) + 0.16*sin(2*pi*9*t + 1.11) + 0.12*sin(2*pi*17*t + 2.49) + 0.08*sin(2*pi*29*t + 0.77)",
+        "y": "0.22*sin(2*pi*6*t + 2.01) + 0.16*sin(2*pi*10*t + 0.64) + 0.12*sin(2*pi*19*t + 1.58) + 0.08*sin(2*pi*31*t + 2.23)",
+        "ax": "0.18*sin(2*pi*4*t + 0.92) + 0.11*sin(2*pi*14*t + 1.83) + 0.07*sin(2*pi*23*t + 2.62)",
+        "ay": "0.18*sin(2*pi*3*t + 1.27) + 0.11*sin(2*pi*13*t + 0.44) + 0.07*sin(2*pi*21*t + 1.90)"
+      }
+    },
+    {
+      "id": "yin_yang",
+      "label": "Yin-Yang (amp mirrors freq/phase, soothing)",
+      "type": "parametric",
+      "duration_s": 150.0,
+      "loop": true,
+      "params": {
+        "x": "0.46*cos(2*pi*1*t)",
+        "y": "0.20*sin(2*pi*2*t)",
+        "ax": "-0.20*sin(2*pi*2*t)",
+        "ay": "-0.46*cos(2*pi*1*t)"
+      }
+    },
+    {
+      "id": "tesseract_roll",
+      "label": "Tesseract Roll (corners implied, smooth continuous)",
+      "type": "parametric",
+      "duration_s": 135.0,
+      "loop": true,
+      "params": {
+        "x": "0.40*cos(2*pi*1*t) + 0.10*cos(2*pi*4*t)",
+        "y": "0.40*sin(2*pi*1*t) + 0.10*sin(2*pi*6*t)",
+        "ax": "0.28*cos(2*pi*1*t + 1.2) + 0.06*cos(2*pi*9*t)",
+        "ay": "0.28*sin(2*pi*1*t + 1.2) + 0.06*sin(2*pi*7*t)"
+      }
+    },
+    {
+      "id": "crescendo_loop",
+      "label": "Crescendo Loop (slow build to intense center, then release)",
+      "type": "parametric",
+      "duration_s": 180.0,
+      "loop": true,
+      "params": {
+        "x": "(0.16 + 0.32*(0.5-0.5*cos(2*pi*1*t)))*(cos(2*pi*1*t) + 0.20*cos(2*pi*9*t))/1.20",
+        "y": "(0.16 + 0.32*(0.5-0.5*cos(2*pi*1*t)))*(sin(2*pi*1*t) + 0.20*sin(2*pi*11*t))/1.20",
+        "ax": "(0.10 + 0.24*(0.5-0.5*cos(2*pi*1*t)))*cos(2*pi*1*t + 0.8)",
+        "ay": "(0.10 + 0.24*(0.5-0.5*cos(2*pi*1*t)))*sin(2*pi*1*t + 0.8)"
+      }
+    }
+  ]
+}

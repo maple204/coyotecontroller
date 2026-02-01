@@ -1,0 +1,683 @@
+/* v6 layout + existing styling */
+:root{
+  --bg:#121212;
+  --panel:#1b1b1b;
+  --panel2:#161616;
+  --text:#eee;
+  --muted:#bdbdbd;
+
+  --ch1: rgba(0,170,255,0.95);
+  --ch2: rgba(255,80,80,0.95);
+  --ch3: rgba(80,255,140,0.95);
+  --ch4: rgba(255,210,80,0.95);
+
+  --shadow-dark:#000;
+  --shadow-light:#2b2b2b;
+  --radius:14px;
+}
+
+html,body{ margin:0; width:100%; height:100%; background:var(--bg); color:var(--text); font-family: Arial, sans-serif; }
+*{ box-sizing:border-box; }
+
+#app{
+  width:100%;
+  min-height:100vh;
+  display:grid;
+  grid-template-rows: 84px 1fr;
+  gap:10px;
+  padding:10px;
+}
+
+#header{
+  background:var(--panel);
+  border-radius:var(--radius);
+  padding:10px 12px;
+  box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.title-block h1{ margin:0; font-size:32px; font-weight:800; }
+
+.header-buttons{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.mode-btn{
+  background:#222;
+  color:var(--text);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:999px;
+  padding:10px 14px;
+  cursor:pointer;
+  font-weight:700;
+  font-size:14px;
+}
+.mode-btn:hover{ border-color: rgba(255,255,255,0.25); }
+
+.stop-btn{
+  background:#7a1212 !important;
+  border-color:#a22 !important;
+  color:#fff !important;
+}
+.stop-btn:hover{ filter: brightness(1.05); }
+
+.bt-status{
+  color: var(--muted);
+  font-size:12px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+.panel{
+  background:var(--panel);
+  border-radius:var(--radius);
+  box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+  padding:14px;
+  min-width:0;
+}
+
+.panel.subtle{ background: var(--panel2); }
+
+#mainGrid{
+  display:grid;
+  grid-template-columns: 1.35fr 0.85fr;
+  grid-template-rows: auto;
+  gap:12px;
+  min-height:0;
+}
+
+
+#controlsPanel{ grid-column:1; grid-row:1; min-height:0; display:flex; flex-direction:column; gap:12px; }
+
+
+.panelTitle{ color: rgba(255,255,255,0.6); font-size:12px; margin-bottom:8px; }
+
+.control-group{ margin: 12px 0; }
+label{ display:block; color: var(--muted); font-size:14px; margin-bottom:6px; }
+.click-reset{ cursor:pointer; }
+
+.basefreq-controls{ display:flex; gap:12px; align-items:center; }
+#baseFreq{ width:140px; }
+
+input[type="range"]{ width: 100%; accent-color: #ff79c6; }
+input[type="number"]{
+  background:#111;
+  border:1px solid rgba(255,255,255,0.15);
+  color:var(--text);
+  border-radius:10px;
+  padding:10px 12px;
+}
+
+#masterVolVal{ display:inline-block; margin-top:6px; color:var(--muted); }
+
+.row-split{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.small-note{ color: rgba(255,255,255,0.45); font-size:12px; }
+
+.channels{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:12px;
+}
+
+.channel{
+  background: linear-gradient(180deg, #171717, #141414);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  padding: 12px;
+  min-width:0;
+}
+
+.chHeaderRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin: 0 0 10px 0;
+}
+.chTitle{ font-size:18px; font-weight:800; }
+.chTitle.ch1{ color: var(--ch1); }
+.chTitle.ch2{ color: var(--ch2); }
+.chTitle.ch3{ color: var(--ch3); }
+.chTitle.ch4{ color: var(--ch4); }
+
+.devBadge{
+  font-size:12px;
+  font-weight:800;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:#202020;
+  color: rgba(255,255,255,0.8);
+  white-space:nowrap;
+}
+.devBadge.connected{
+  border-color: rgba(120,255,170,0.45);
+  color: rgba(120,255,170,0.95);
+}
+
+.label-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.snap-pill{
+  background:#202020;
+  border:1px solid rgba(255,255,255,0.18);
+  color:var(--text);
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+.snap-pill.on{ border-color: rgba(255,255,255,0.35); }
+.max-pill{ border-color: rgba(255,255,255,0.25); }
+
+#oscilloscope{
+  width:100%;
+  height:100%;
+  flex:1;
+  background:#0d0d0d;
+  border-radius: 12px;
+}
+
+.square-wrap{
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background:#0d0d0d;
+  border-radius: 12px;
+  overflow:hidden;
+}
+#fieldCanvas{ width:100%; height:100%; display:block; }
+
+.touch-controls{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.touch-row label{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.touch-row.two{
+  display:flex;
+  gap:10px;
+}
+.touch-row.two .half{ flex:1; }
+
+.motion-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin: 10px 0;
+  flex-wrap:wrap;
+}
+.motion-row label{ margin:0; min-width: 110px; display:flex; align-items:baseline; gap:8px; }
+.motion-row label span{ color: var(--muted); }
+.motion-row select{
+  background:#111;
+  border:1px solid rgba(255,255,255,0.15);
+  color:var(--text);
+  border-radius:10px;
+  padding:10px 12px;
+  min-width: 220px;
+}
+
+dialog{
+  border:none;
+  border-radius: 16px;
+  padding: 16px;
+  background: #1a1a1a;
+  color: var(--text);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.65);
+  width: min(420px, 92vw);
+}
+.dlg-title{ margin:0 0 8px 0; }
+.dlg-text{ color: rgba(255,255,255,0.7); margin-bottom: 10px; }
+.dlg-value{ margin-top: 8px; color: rgba(255,255,255,0.85); }
+.dlg-actions{ margin-top: 12px; display:flex; gap:10px; justify-content:flex-end; }
+
+#debugOverlay{
+  position:fixed; left:12px; bottom:12px; z-index:9999;
+  background:rgba(0,0,0,0.55); color:#fff; padding:8px 10px;
+  border-radius:10px; font:12px/1.3 Arial; max-width:55vw;
+  pointer-events:none; white-space:pre-wrap;
+  display:none;
+}
+#debugOverlay.show{ display:block; }
+
+@media (max-width: 980px){
+  #mainGrid{
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto 280px;
+  }
+  #controlsPanel{ grid-column:1; grid-row:1; }
+          .channels{ grid-template-columns: 1fr; }
+  .bt-status{ width:100%; white-space:normal; }
+}
+
+
+/* --- Vis touch pad overlay --- */
+.vis-pad{
+  position:relative;
+  overflow:hidden;
+  touch-action:none;
+  user-select:none;
+}
+.vis-pad canvas{ width:100%; height:100%; display:block; }
+
+.vis-crosshair{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px) 50% 0/1px 100%,
+    linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px) 0 50%/100% 1px;
+}
+
+.vis-cursor{
+  position:absolute;
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,0.85);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.45);
+  pointer-events:none;
+  transform: translate(-50%, -50%);
+  left:50%;
+  top:50%;
+}
+
+.touch-row.toggles{
+  margin-top:2px;
+}
+/* Toggle labels should sit immediately beside checkbox (not spaced to far edge) */
+.touch-row.toggles label{ justify-content:flex-start !important; }
+.toggle{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:var(--muted);
+  font-size:13px;
+}
+.toggle input{ transform: translateY(1px); }
+
+
+/* Touch negative sliders: drag left to increase */
+.neg-slider{ direction: rtl; }
+
+/* Scope inside left column */
+#scopePanel{ display:flex; flex-direction:column; height:260px; }
+
+/* Dual-stick cursors (HTML uses .vis-cursor-freq/.vis-cursor-amp) */
+.vis-cursor{ position:absolute; transform:translate(-50%,-50%); left:50%; top:50%; pointer-events:none; }
+.vis-cursor-freq{ width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,0.85); background: rgba(0,0,0,0.10); box-shadow:0 0 0 2px rgba(0,0,0,0.45); z-index:5; }
+.vis-cursor-amp{ width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,121,198,0.95); background: rgba(0,0,0,0.10); box-shadow:0 0 0 2px rgba(0,0,0,0.45); z-index:6; }
+
+#app{min-height:100vh;}
+
+
+/* --- UI Tweaks Round 3 --- */
+#header{ padding:8px 10px; }
+.header-buttons{ gap:10px; }
+
+/* --- 1. Consolidated Header & Floating Stop Button --- */
+#header { 
+  padding: 8px 10px; 
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  /* This padding prevents other buttons from sliding under the floating STOP button */
+  padding-right: 110px; 
+}
+
+/* Floating STOP Button - Matched to Header Style */
+#stopBtn {
+  position: fixed;
+  top: 25px;         
+  right: 25px;        
+  z-index: 100000;
+  
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  
+  background: #7a1212 !important;
+  border: 1px solid #ff4444 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transition: transform 0.1s ease;
+}
+
+#stopBtn:hover { filter: brightness(1.2); }
+#stopBtn:active { transform: scale(0.95); }
+
+.header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-right: 110px; /* Space for the floating button */
+}
+
+@media (max-width: 980px) {
+    #stopBtn { top: 15px; right: 15px; }
+    .header-buttons { padding-right: 0; }
+}
+
+/* --- 2. Cleaned up Channel Layout --- */
+.channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.channel {
+  background: linear-gradient(180deg, #171717, #141414);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 16px;
+  padding: 12px 12px 14px 12px; /* Bottom padding for range sliders */
+  min-width: 0;
+}
+
+/* Hide Phase/Cycle controls as requested */
+.channel .control-group:nth-child(n+4) {
+  display: none !important;
+}
+
+/* Tighten spacing for the 3 remaining controls */
+.channel .control-group:nth-child(3) {
+  margin-bottom: 0 !important;
+}
+
+/* --- 3. Biome Mode Specifics --- */
+body[data-mode="biome"] { background: #101012; }
+
+/* Hide standard panels in Biome mode */
+body[data-mode="biome"] #touchPanel,
+body[data-mode="biome"] #motionPanel {
+  display: none !important;
+}
+
+/* Hide Biome specific items when NOT in biome mode */
+body:not([data-mode="biome"]) #biomePanel { 
+  display: none !important; 
+}
+
+/* Hide the manual feed list and start/stop as requested for Caretaker mode */
+body[data-mode="biome"] #biomePanel .biome-feed-list,
+body[data-mode="biome"] #caretakerBtn,
+#biomePanel .biome-section-title,
+#biomePanel .biome-hint { 
+  display: none !important; 
+}
+
+@media (max-width: 980px) {
+    #stopBtn {
+        top: 15px;
+        right: 15px;
+    }
+}
+
+/* Adjust header spacing so other buttons don't feel crowded */
+.header-buttons {
+  padding-right: 110px; 
+}
+
+#rightPanel{ grid-column:2; grid-row:1; min-height:0; display:flex; flex-direction:column; gap:12px; }
+
+.subpanel{
+  background: var(--panel2);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 18px;
+  padding:14px;
+  box-shadow:none;
+  min-width:0;
+}
+
+/* Global Master/Base card */
+#globalPanel{ padding:14px; }
+#globalPanel .control-group{ margin: 10px 0; }
+#globalPanel .control-group:first-child{ margin-top: 6px; }
+#globalPanel .control-group:last-child{ margin-bottom: 6px; }
+.visually-hidden-input{ display:none !important; }
+
+/* Scope: no inner padding between stroke and black canvas */
+#scopePanel.scopeFrame{
+  height:260px;
+  padding:0;
+  overflow:hidden;
+  border-radius:18px;
+}
+#scopePanel.scopeFrame #oscilloscope{
+  width:100%;
+  height:100%;
+  border-radius:18px;
+  display:block;
+  background:#0d0d0d;
+}
+
+/* Vis: grey stroke around the pad, no extra titles */
+#vizPanel.visFrame{ padding:0; overflow:hidden; }
+#vizPanel.visFrame .square-wrap{
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:18px;
+}
+#vizPanel.visFrame #fieldCanvas{ border-radius:18px; }
+
+/* Remove any panel titles inside right column if present */
+#rightPanel .panelTitle{ display:none; }
+
+/* Touch invert labels sit beside checkbox */
+.check-row label{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:10px;
+}
+.check-row span{ opacity:0.9; }
+
+/* Motion (Scripts) top layout */
+.motion-top{ display:flex; flex-direction:column; gap:8px; }
+.motion-label{ color: var(--muted); font-size:14px; font-weight:400; margin-bottom:6px; }
+.motion-controls{ display:flex; gap:12px; align-items:center; }
+.motion-controls select{ flex:1; min-width:0; background:#111; border:1px solid rgba(255,255,255,0.15); color:var(--text); border-radius:10px; padding:10px 12px; }
+
+.start-btn{ border-color: rgba(120,255,160,0.45); background: rgba(70,160,100,0.25); }
+.stop-btn2{ border-color: rgba(255,120,120,0.45); background: rgba(160,70,70,0.25); }
+
+/* Script running indicator: animated ring */
+.start-btn{ position:relative; }
+.start-btn.running::after{
+  content:"";
+  position:absolute;
+  inset:-3px;
+  border-radius:999px;
+  padding:2px;
+  background: conic-gradient(from 0deg, rgba(120,255,160,0.0), rgba(120,255,160,0.85), rgba(120,255,160,0.0));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: spinRing 1.3s linear infinite;
+  pointer-events:none;
+}
+@keyframes spinRing{ to{ transform: rotate(360deg); } }
+
+/* Tighten header/panel padding consistency */
+.panel{ padding:14px; }
+
+#baseFreqLabel, #masterVolLabel{ display:flex; align-items:baseline; gap:8px; }
+
+
+/* --- Biome mode gating --- */
+body[data-mode="biome"] #touchPanel,
+body[data-mode="biome"] #motionPanel {
+  display:none !important;
+}
+body:not([data-mode="biome"]) #biomePanel { display:none !important; }
+
+/* Feed UI */
+#biomePanel .biome-controls{ display:flex; flex-direction:column; gap:10px; }
+#biomePanel .biome-section-title{ font-weight:600; color:var(--text); opacity:0.9; margin-top:4px; }
+#biomePanel .biome-feed-list{ display:grid; grid-template-columns:1fr; gap:8px; }
+.biome-feed-btn{
+  display:flex; align-items:center; gap:10px;
+  background: linear-gradient(180deg,#242424,#1a1a1a);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;
+  padding:10px 12px;
+  color:var(--text);
+  cursor:pointer;
+}
+.biome-feed-btn:hover{ border-color: rgba(255,255,255,0.22); }
+.dot{ width:12px; height:12px; border-radius:50%; display:inline-block; }
+.dot-sugar{ background: rgba(255,200,80,0.95); }
+.dot-salt{ background: rgba(120,190,255,0.95); }
+.dot-iron{ background: rgba(255,100,90,0.95); }
+.dot-water{ background: rgba(110,255,220,0.95); }
+.dot-sulfur{ background: rgba(170,120,255,0.95); }
+.dot-carbon{ background: rgba(240,240,240,0.85); }
+.biome-caretaker-row{ display:flex; gap:10px; align-items:center; }
+.biome-select{
+  flex:1;
+  background:#1b1b1b;
+  border:1px solid rgba(255,255,255,0.14);
+  color:var(--text);
+  border-radius:12px;
+  padding:10px 12px;
+}
+.biome-hud{ display:flex; justify-content:flex-end; }
+.biome-hint{
+  font-size:12px;
+  color:rgba(255,255,255,0.65);
+  background: rgba(0,0,0,0.25);
+  border:1px solid rgba(255,255,255,0.10);
+  padding:6px 10px;
+  border-radius:999px;
+}
+
+
+/* --- Biome: caretakers only (no manual feed, no start/stop) --- */
+body[data-mode="biome"] #biomePanel .biome-feed-list { display:none !important; }
+body[data-mode="biome"] #caretakerBtn { display:none !important; }
+body[data-mode="biome"] { background: #101012; }
+
+/* --- Phase UI disabled (v1) --- */
+.phaseControl,
+.phaseCycleControl,
+.touchPhaseControl{
+  display:none !important;
+}
+
+/* --- Routing UI for missing devices --- */
+.devBadge.routeable{ cursor:pointer; user-select:none; }
+.devBadge.routeable:hover{ border-color: rgba(255,255,255,0.30); }
+.devBadge.routeon{
+  border-color: rgba(120,255,170,0.45);
+  color: rgba(120,255,170,0.95);
+}
+
+.channel-routed .routed-note{
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* --- Routed channel: grey everything except Unroute button --- */
+.channel-routed{
+  opacity: 0.38;
+}
+.channel-routed .route-unmap{
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  filter: none !important;
+}
+.route-unmap{
+  margin-left: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.25);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+}
+.route-unmap:hover{
+  border-color: rgba(255,255,255,0.35);
+}
+
+/* ============================================================
+   FINAL UI CLEANUP
+   - Hides Phase UI (items 4 & 5)
+   - Restores Amplitude/Multiplier (items 1-3) for all channels
+   - Tightens spacing and removes redundant labels
+   ============================================================ */
+
+/* 1. Hide only the Phase and Phase Cycle groups in the boxes */
+.channel .control-group:nth-child(n+4) {
+  display: none !important;
+}
+
+/* 2. Tighten space under Frequency Multiplier (the last visible item) */
+.channel .control-group:nth-child(3) {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 3. Normalize panel padding and range margins */
+.channel {
+  padding-bottom: 14px !important;
+}
+.channel input[type="range"] {
+  margin: 0;
+}
+
+/* 4. Hide Biome Feed header & hint text */
+#biomePanel .biome-section-title,
+#biomePanel .biome-hint {
+  display: none !important;
+}
+
+/* 5. Caretaker & Script Intensity Label alignment */
+#caretakerIntensityVal { display: none !important; }
+#caretakerIntensityValInline { margin-left: 10px; opacity: 0.85; }
+
+/* 6. Static Stop Button Style (No Spinning Ring) */
+#scriptToggleBtn.running {
+  animation: none !important;
+  background: rgba(220,60,60,0.22) !important;
+  border-color: rgba(220,60,60,0.55) !important;
+  color: rgba(255,220,220,0.95) !important;
+}
+#scriptToggleBtn.running::after { display: none !important; }
