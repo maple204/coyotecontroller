@@ -1,14 +1,15 @@
 /**
- * Biome Engine v7.0 - Master Cumulative Ecology
+ * Biome Engine v8.0 - Master Cumulative Ecology
  * --------------------------------------------
  * Features:
- * - 4 Unique Biological Structures (Worms, Hairy Blobs, Pulsers, Centipedes)
- * - 4-Way Predation Loop & Chemotaxis (Food seeking)
+ * - 6 Unique Biological Structures (Worms, Pulsers, Centipedes, Breathers, Hairy Blobs, Abyssal Pulsars)
+ * - 6-Way Predation Loop & Chemotaxis (Food seeking)
+ * - Weighted Caretaker Diets (Signature feeding with background variety)
  * - Metabolic Scaling (Hunger affects swimming speed)
  * - Lifecycle: Baby Growth -> Adult Maturity -> Death Dissolution
  * - Visible Diet: Nutrients swirl inside the translucent bodies
  * - Gaussian Bokeh Rendering: Procedural Z-Blur focal plane
- * - Rotifer AI: Parasites hunt and latch to drive audio channels
+ * - Rotifer AI: Parasites hunt and latch to drive audio channels (Fixed Drift Bug)
  */
 
 (() => {
@@ -57,24 +58,36 @@
   };
 
   const PREY_MAP = {
-    bacteria: "archaea",    // Breathers eat Pulsers
-    archaea: "flagellate",  // Pulsers eat Ticklers
-    flagellate: "lattice",  // Ticklers eat Compressors
-    lattice: "bacteria"     // Compressors eat Breathers
+    bacteria: "archaea",      // Breathers eat Pulsers
+    archaea: "flagellate",    // Pulsers eat Ticklers
+    flagellate: "lattice",    // Ticklers eat Compressors
+    lattice: "mycelium",      // Compressors eat Hairy Blobs
+    mycelium: "scintillator", // Hairy Blobs eat Abyssal Pulsars
+    scintillator: "bacteria"  // Abyssal Pulsars eat Breathers
   };
 
-  const SPECIES = {
+  const CARETAKER_DIETS = {
+    gardener: { sugar: 12, water: 12, carbon: 4 }, // Heavy on growth/blend
+    bloom:    { sugar: 15, water: 8,  sulfur: 4 },
+    ballast:  { salt: 12,  carbon: 10, iron: 4   },
+    ironbeat: { iron: 15,  salt: 5,   sugar: 3  },
+    sulfuric: { sulfur: 12, iron: 8,   carbon: 4 },
+    drifter:  { water: 15, carbon: 5, salt: 3   }
+  };
+
+const SPECIES = {
     bacteria: {
       name: "Breathers", speed: 0.00006, turn: 0.015, wander: 0.02, drag: 0.96,
       coreRadius: 0.015, prefs: ["sugar", "water"], reproduction: "mitosis",
       makeNodes(a, t) {
-        // HAIRY BLOB: Core nucleus + reaching/grasping cilia
+        // RESTORED HAIRY BLOB: Core nucleus + reactive fluid-drifting cilia
         const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.2 }];
         if (a.state === "alive") {
-          for (let i = 0; i < 10; i++) {
-            const ang = (i / 10) * TAU + Math.sin(t * 5 + i);
+          const localT = t * a.timeScale;
+          for (let i = 0; i < 12; i++) {
+            const ang = (i / 12) * TAU + Math.sin(localT * 5 + i);
             const reach = 0.8 + Math.cos(ang - a.heading) * 0.6;
-            const ext = 0.9 + 0.1 * Math.sin(t * 8 + i);
+            const ext = 0.9 + 0.1 * Math.sin(localT * 8 + i);
             const [dx, dy] = rotate2(a.r * reach * ext, 0, ang);
             ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.2, rgb: a.currRgb, a: a.currAlpha * 0.3, s: 0.6 });
           }
@@ -86,11 +99,12 @@
       name: "Pulsers", speed: 0.0001, turn: 0.03, wander: 0.015, drag: 0.94,
       coreRadius: 0.013, prefs: ["iron", "salt"], reproduction: "spores",
       makeNodes(a, t) {
-        // SPIKY STAR: Dense core + jittering defense rays
+        // RESTORED SPIKY STAR: Dense core + jittering defense rays
         const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.1 }];
         if (a.state === "alive") {
+          const localT = t * a.timeScale;
           for (let i = 0; i < 6; i++) {
-            const ang = (i / 6) * TAU + Math.sin(t * 15) * 0.05;
+            const ang = (i / 6) * TAU + Math.sin(localT * 15) * 0.05;
             const [dx, dy] = rotate2(a.r * 1.5, 0, ang);
             ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.2, rgb: [255, 255, 255], a: a.currAlpha * 0.4, s: 0.4 });
           }
@@ -99,38 +113,39 @@
       }
     },
     flagellate: {
-      name: "Ticklers", speed: 0.00015, turn: 0.04, wander: 0.05, drag: 0.9,
-      coreRadius: 0.01, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
+      name: "Comb Jellies", speed: 0.00015, turn: 0.04, wander: 0.05, drag: 0.9,
+      coreRadius: 0.012, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
       makeNodes(a, t) {
-        // PURPLE WORM: 9-segment sinusoidal undulating chain
-        const ns = []; const segs = 9;
+        // RIBBON FILAMENTS: Two long undulating thin lines
+        const ns = [];
         const hv = Math.hypot(a.vx, a.vy) + 1e-9;
-        const hx = a.state === "alive" ? a.vx / hv : Math.cos(a.heading);
-        const hy = a.state === "alive" ? a.vy / hv : Math.sin(a.heading);
-        for (let i = 0; i < segs; i++) {
-          const u = i / (segs - 1);
-          const wig = (a.state === "alive" ? Math.sin(t * 12 + a.seed - i * 0.8) : 0) * (0.3 * a.r);
-          ns.push({ 
-            x: a.x - hx * i * a.r * 0.8 + (-hy) * wig, 
-            y: a.y - hy * i * a.r * 0.8 + hx * wig, 
-            z: a.z, r: a.r * (1.1 - u * 0.6), a: a.currAlpha, rgb: [205, 140, 235], s: 0.2 
-          });
+        const hx = a.vx / hv, hy = a.vy / hv;
+        const ang = Math.atan2(hy, hx);
+        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * 0.8, rgb: [255,255,255], a: a.currAlpha, s: 0.2 });
+        for (let side = -1; side <= 1; side += 2) {
+          if (side === 0) continue;
+          for (let j = 0; j < 10; j++) {
+            const wave = Math.sin(t * a.timeScale * 10 - j * 0.6 + a.seed) * a.r * 0.8;
+            const [fx, fy] = rotate2(-j * a.r * 0.8, side * a.r * 0.4 + wave, ang);
+            ns.push({ x: a.x + fx, y: a.y + fy, z: a.z, r: a.r * 0.1, rgb: [100 + (j/9) * 155, 200, 255], a: a.currAlpha * (1 - j/9), s: 0.2 });
+          }
         }
         return ns;
       }
     },
     lattice: {
-      name: "Compressors", speed: 0.00005, turn: 0.01, wander: 0.005, drag: 0.97,
-      coreRadius: 0.016, prefs: ["carbon", "salt"], reproduction: "mitosis",
+      name: "Centipedes", speed: 0.00005, turn: 0.01, wander: 0.005, drag: 0.97,
+      coreRadius: 0.012, prefs: ["carbon", "salt"], reproduction: "mitosis",
       makeNodes(a, t) {
-        // CENTIPEDE TUBE: Segmented body with metachronal wave-driven fins
+        // RESTORED CENTIPEDE TUBE: Segmented body with metachronal wave-driven fins
         const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.2 }];
         if (a.state === "alive") {
+          const localT = t * a.timeScale;
           for (let i = 0; i < 5; i++) {
-            const cx = a.x - Math.cos(a.heading) * i * a.r * 1.2;
-            const cy = a.y - Math.sin(a.heading) * i * a.r * 1.2;
+            const cx = a.x - Math.cos(a.heading) * i * a.r * 1.4;
+            const cy = a.y - Math.sin(a.heading) * i * a.r * 1.4;
             for (let side = -1; side <= 1; side += 2) {
-              const wave = Math.sin(t * 8 - i * 1.2) * 0.5;
+              const wave = Math.sin(localT * 8 - i * 1.2) * 0.5;
               const [fx, fy] = rotate2(a.r * 1.2, side * a.r * (0.8 + wave), a.heading);
               ns.push({ x: cx + fx, y: cy + fy, z: a.z, r: a.r * 0.2, rgb: [255, 255, 255], a: a.currAlpha * 0.3, s: 0.5 });
             }
@@ -138,26 +153,110 @@
         }
         return ns;
       }
+    },
+mycelium: {
+      name: "Purple Worms", speed: 0.00015, turn: 0.04, wander: 0.05, drag: 0.9,
+      coreRadius: 0.012, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        // RESTORED PURPLE WORM: 9-segment sinusoidal undulating chain
+        const ns = []; 
+        const segs = 9;
+        const hv = Math.hypot(a.vx, a.vy) + 1e-9;
+        const hx = a.state === "alive" ? a.vx / hv : Math.cos(a.heading);
+        const hy = a.state === "alive" ? a.vy / hv : Math.sin(a.heading);
+        
+        // Individualized wiggle speed
+        const wiggleSpeed = 12 * a.timeScale;
+
+        for (let i = 0; i < segs; i++) {
+          const u = i / (segs - 1);
+          // Wave logic: wiggle propagates down the body
+          const wig = (a.state === "alive" ? Math.sin(t * wiggleSpeed + a.seed - i * 0.8) : 0) * (0.3 * a.r);
+          
+          ns.push({ 
+            x: a.x - hx * i * a.r * 0.8 + (-hy) * wig, 
+            y: a.y - hy * i * a.r * 0.8 + hx * wig, 
+            z: a.z, 
+            r: a.r * (1.1 - u * 0.6), 
+            a: a.currAlpha, 
+            rgb: [205, 140, 235], // Classic Purple
+            s: 0.2 
+          });
+        }
+        return ns;
+      }
+    },
+    scintillator: {
+      name: "Abyssal Pulsars", speed: 0.00025, turn: 0.12, wander: 0.1, drag: 0.9,
+      coreRadius: 0.012, prefs: ["iron", "water"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        // GHOST COMET: Sharp head + undulated fiber-optic tail
+        const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r * 1.2, rgb: [255, 255, 255], a: a.currAlpha, s: 0.05 }];
+        const speed = Math.hypot(a.vx, a.vy) * 1200;
+        for (let i = 0; i < 6; i++) {
+          const ang = a.heading + Math.PI + Math.sin(t * a.timeScale * 10 + i) * 0.2;
+          for (let j = 1; j <= 5; j++) {
+            const [dx, dy] = rotate2(a.r * (1.2 + speed) * j, 0, ang);
+            ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.1, rgb: [160, 220, 255], a: a.currAlpha * (0.8 - j/6), s: 0.1 });
+          }
+        }
+        return ns;
+      }
     }
   };
 
-  class NutrientBlob {
+class NutrientBlob {
     constructor(id, nId, x, y, amount) {
-      this.id = id; this.nutrientId = nId;
+      this.id = id; 
+      this.nutrientId = nId;
       this.profile = NUTRIENTS[nId] || NUTRIENTS.sugar;
-      this.x = x; this.y = y; this.z = rand(-0.3, 0.3);
-      this.mass = amount; this.dead = false;
-      this.parts = Array.from({length: 3}, () => ({ox: rand(-0.02, 0.02), oy: rand(-0.02, 0.02), p: rand(0, TAU)}));
-    }
-    consume(u) { this.mass -= u; if (this.mass <= 0.01) this.dead = true; return u; }
-    step(dt) { this.mass *= (1 - dt * 0.01); if (this.mass <= 0.01) this.dead = true; }
-    getNodes(t) {
-      const r = 0.02 * (0.4 + 0.6 * this.mass);
-      return this.parts.map(p => ({ 
-        x: this.x + p.ox + Math.sin(t + p.p) * 0.005, 
-        y: this.y + p.oy + Math.cos(t + p.p) * 0.005, 
-        z: this.z, r, rgb: this.profile.tint, a: 0.3, s: 0.6 
+      this.x = x; this.y = y; this.z = rand(-0.1, 0.1);
+      this.mass = amount; 
+      this.dead = false;
+      this.rot = rand(0, TAU);
+
+      // CRYSTAL STRUCTURE: Generate 4 unique needle-like shards
+      this.shards = Array.from({length: 4}, () => ({
+        ang: rand(0, TAU),
+        len: rand(0.6, 1.3),
+        off: rand(0, TAU)
       }));
+    }
+
+    consume(u) { 
+      this.mass -= u; 
+      if (this.mass <= 0.01) this.dead = true; 
+      return u; 
+    }
+
+    step(dt) { 
+      this.mass *= (1 - dt * 0.01); 
+      this.rot += dt * 0.4; // Slowly rotate the shard structure
+      if (this.mass <= 0.01) this.dead = true; 
+    }
+
+    getNodes(t) {
+      const rBase = 0.005 * (0.5 + 0.5 * this.mass);
+      const ns = [];
+      
+      // 1. Core Spark: Sharp, bright center point
+      ns.push({ 
+        x: this.x, y: this.y, z: this.z, 
+        r: rBase * 1.6, rgb: [255, 255, 255], a: 0.7, s: 0.05 
+      });
+      
+      // 2. Crystalline Shards: Needle lines radiating from center
+      // Softness (s) is set very low (0.05) to ensure they are sharp lines, not blurry rings
+      this.shards.forEach(s => {
+        const drift = Math.sin(t * 1.2 + s.off) * 0.001;
+        const [dx, dy] = rotate2(0.014 * s.len * this.mass, 0, s.ang + this.rot);
+        ns.push({ 
+          x: this.x + dx + drift, y: this.y + dy + drift, z: this.z, 
+          r: rBase, rgb: this.profile.tint, a: 0.5, s: 0.05 
+        });
+      });
+      
+      return ns;
     }
   }
 
@@ -183,54 +282,66 @@
   // ---------------------------------------------------------------------------
   // FAMILY SOUND LIBRARIES (monophonic; identity via register + gating + texture)
   // ---------------------------------------------------------------------------
-  const SOUND_LIB = {
-    bacteria: {
-      identity: "breath shimmer",
-      regMul: 0.85, minMul: 0.45, maxMul: 2.6,
-      ratios: [1, 6/5, 4/3, 3/2, 5/3, 2],
+const SOUND_LIB = {
+    bacteria: { // Diatoms
+      identity: "crystalline click",
+      regMul: 2.5, minMul: 2.0, maxMul: 3.0, // High and narrow
+      ratios: [1, 1.1, 1.2],
+      hopHz: [2.0, 5.0, 8.0],
+      glide: 0.5, // Snap to notes
+      vibratoHz: [8, 12], vibratoAmt: [0.01, 0.02],
+      gate: "staccato", talkiness: 0.4, grit: 0.1,
+      echo: { taps: [0.05], gains: [0.3] }
+    },
+    archaea: { // Radiolars
+      identity: "needle sweep",
+      regMul: 1.2, minMul: 0.5, maxMul: 4.0, // Wide sweep range
+      ratios: [1, 1.5, 2, 0.75],
+      hopHz: [0.2, 0.5, 0.8],
+      glide: 0.02, // Very slow slides
+      vibratoHz: [0.5, 2], vibratoAmt: [0.02, 0.05],
+      gate: "swell", talkiness: 0.2, grit: 0.02,
+      echo: { taps: [0.4, 0.8], gains: [0.2, 0.1] }
+    },
+    flagellate: { // Comb Jellies
+      identity: "rainbow shimmer",
+      regMul: 1.0, minMul: 0.8, maxMul: 1.5,
+      ratios: [1, 1.25, 1.33, 1.5, 1.66],
+      hopHz: [0.5, 1.5, 3.0],
+      glide: 0.15,
+      vibratoHz: [4, 7], vibratoAmt: [0.03, 0.08],
+      gate: "talk", talkiness: 0.6, grit: 0.05,
+      echo: { taps: [0.1, 0.2, 0.3], gains: [0.3, 0.2, 0.1] }
+    },
+    lattice: { // Rib-Cages
+      identity: "deep vertebral thump",
+      regMul: 0.4, minMul: 0.3, maxMul: 0.6, // Very low
+      ratios: [1, 1.1],
+      hopHz: [0.1, 0.3],
+      glide: 0.05,
+      vibratoHz: [0.1, 0.5], vibratoAmt: [0.01, 0.02],
+      gate: "breath", talkiness: 0.1, grit: 0.01,
+      echo: { taps: [0.5], gains: [0.4] }
+    },
+    mycelium: { // Phantom Worms
+      identity: "liquid eel",
+      regMul: 0.8, minMul: 0.5, maxMul: 2.0,
+      ratios: [1, 1.2, 1.4, 1.6],
       hopHz: [0.4, 1.0, 2.0],
-      vibratoHz: [0.12, 0.35], vibratoAmt: [0.004, 0.015],
-      gate: "breath",
-      talkiness: 0.35,
-      grit: 0.06,
-      echo: { taps: [0.08, 0.16, 0.28], gains: [0.35, 0.20, 0.12] },
-      phaseReset: false
+      glide: 0.04, // Liquid slides
+      vibratoHz: [2, 5], vibratoAmt: [0.05, 0.1],
+      gate: "swell", talkiness: 0.3, grit: 0.08,
+      echo: { taps: [0.2, 0.4], gains: [0.3, 0.2] }
     },
-    archaea: {
-      identity: "staccato star",
-      regMul: 1.75, minMul: 0.90, maxMul: 4.5,
-      ratios: [1, 9/8, 5/4, 4/3, 3/2, 7/4, 2],
-      hopHz: [1.0, 3.5, 6.0],
-      vibratoHz: [0.0, 0.25], vibratoAmt: [0.0, 0.01],
-      gate: "staccato",
-      talkiness: 0.22,
-      grit: 0.16,
-      echo: { taps: [0.05, 0.11, 0.18], gains: [0.25, 0.15, 0.08] },
-      phaseReset: true
-    },
-    flagellate: {
-      identity: "talky worms",
-      regMul: 1.15, minMul: 0.70, maxMul: 3.8,
-      ratios: [1, 9/8, 6/5, 5/4, 4/3, 3/2, 2],
-      hopHz: [0.9, 2.8, 5.0],
-      vibratoHz: [0.25, 1.1], vibratoAmt: [0.006, 0.03],
-      gate: "talk",
-      talkiness: 0.55,
-      grit: 0.12,
-      echo: { taps: [0.09, 0.18, 0.32], gains: [0.32, 0.18, 0.10] },
-      phaseReset: false
-    },
-    lattice: {
-      identity: "low swells",
-      regMul: 0.55, minMul: 0.30, maxMul: 1.8,
-      ratios: [1, 4/3, 3/2, 2, 8/5, 5/3],
-      hopHz: [0.25, 0.7, 1.4],
-      vibratoHz: [0.05, 0.2], vibratoAmt: [0.002, 0.008],
-      gate: "swell",
-      talkiness: 0.12,
-      grit: 0.08,
-      echo: { taps: [0.14, 0.28, 0.46], gains: [0.25, 0.16, 0.10] },
-      phaseReset: false
+    scintillator: { // Abyssal Pulsars
+      identity: "glitch pulsar",
+      regMul: 1.8, minMul: 1.0, maxMul: 5.0,
+      ratios: [1, 1.5, 2, 2.5, 3, 4],
+      hopHz: [3.0, 6.0, 12.0], // Fast hops
+      glide: 0.8, // Immediate snaps
+      vibratoHz: [10, 20], vibratoAmt: [0.1, 0.2],
+      gate: "staccato", talkiness: 0.9, grit: 0.4,
+      echo: { taps: [0.02, 0.05, 0.08], gains: [0.5, 0.3, 0.1] }
     }
   };
 
@@ -258,7 +369,8 @@
         return 1.0;
     }
   }
-class Parasite {
+
+  class Parasite {
     constructor(id) {
       this.id = id; this.x = rand(0.3, 0.7); this.y = rand(0.3, 0.7); this.z = 0;
       this.heading = rand(0, TAU); this.state = "hunting"; this.host = null; this.satiety = 0;
@@ -276,23 +388,17 @@ class Parasite {
       // Forever parasite: never despawn. Opportunistic re-homing.
       this.rehomeCooldown = rand(0.5, 1.5);
       this.commitLeft = 0;
-
     }
 
     _scoreHost(a, world) {
       if (!a || a.state !== "alive") return -1e9;
-
       const dx = a.x - this.x, dy = a.y - this.y;
       const d = Math.hypot(dx, dy);
 
-      // Closer is much better
       const distScore = 1.0 / (0.02 + d);
-
-      // Prefer energetic / feeding hosts (more expressive)
       const energy = clamp(a.energy ?? 0.8, 0, 2.0);
       const feedBonus = (a.mode === "feed") ? 0.55 : 0.0;
 
-      // Diversity bonus: prefer families not already represented by other latched parasites
       let famCount = 0;
       const fam = a.speciesId;
       for (const p of world.parasites) {
@@ -300,110 +406,9 @@ class Parasite {
         if (p.state === "latched" && p.host && p.host.state === "alive" && p.host.speciesId === fam) famCount++;
       }
       const diversityBonus = (famCount === 0) ? 0.35 : (famCount === 1 ? 0.12 : -0.10);
-
-      // Tiny noise to prevent perfect determinism
       const noise = (Math.random() - 0.5) * 0.05;
 
       return distScore * 1.15 + energy * 0.25 + feedBonus + diversityBonus + noise;
-    }
-
-
-    step(dt, world) {
-      // Parasites live forever (never despawn). They may re-home opportunistically.
-
-      // Cooldowns to prevent thrashing
-      this.rehomeCooldown = Math.max(0, this.rehomeCooldown - dt);
-      this.commitLeft = Math.max(0, this.commitLeft - dt);
-      const canConsiderSwitch = (this.rehomeCooldown <= 0 && this.commitLeft <= 0);
-
-      if (this.state === "latched") {
-        // Host died -> detach and hunt again
-        if (!this.host || this.host.state !== "alive") {
-          this.detach();
-          this.rehomeCooldown = rand(0.2, 0.6);
-          return;
-        }
-
-        // Stick to host
-        this.x = lerp(this.x, this.host.x, 0.12);
-        this.y = lerp(this.y, this.host.y, 0.12);
-
-        // Consider a better host nearby
-        if (canConsiderSwitch) {
-          const currentScore = this._scoreHost(this.host, world);
-
-          let best = null;
-          let bestScore = currentScore;
-
-          const R = 0.18; // local search radius
-          for (const a of world.agents) {
-            if (!a || a.state !== "alive") continue;
-            if (a.isOccupied && a !== this.host) continue;
-
-            const d = Math.hypot(a.x - this.x, a.y - this.y);
-            if (d > R) continue;
-
-            const s = this._scoreHost(a, world);
-            if (s > bestScore) { bestScore = s; best = a; }
-          }
-
-          // Hysteresis threshold avoids constant swapping
-          if (best && bestScore > currentScore + 0.65) {
-            // Switch hosts
-            this.host.isOccupied = false;
-            this.host = best;
-            best.isOccupied = true;
-            this.commitLeft = rand(0.8, 2.0);
-            this.rehomeCooldown = rand(0.6, 1.6);
-          } else {
-            // Don't rescore every frame
-            this.rehomeCooldown = rand(0.25, 0.6);
-          }
-        }
-
-        // No satiety-based forced detach anymore
-        this.satiety = 0;
-        return;
-      }
-
-      // Hunting state
-      this.state = "hunting";
-      this.host = null;
-      this.satiety = 0;
-
-      // Find best host candidate in a wider radius
-      let best = null;
-      let bestScore = -1e9;
-      const R = 0.35;
-      for (const a of world.agents) {
-        if (!a || a.state !== "alive") continue;
-        if (a.isOccupied) continue;
-
-        const d = Math.hypot(a.x - this.x, a.y - this.y);
-        if (d > R) continue;
-
-        const s = this._scoreHost(a, world);
-        if (s > bestScore) { bestScore = s; best = a; }
-      }
-
-      if (best) {
-        const ang = Math.atan2(best.y - this.y, best.x - this.x);
-        this.heading = lerp(this.heading, ang, 0.05);
-        this.x += Math.cos(this.heading) * 0.003;
-        this.y += Math.sin(this.heading) * 0.003;
-
-        if (Math.hypot(best.x - this.x, best.y - this.y) < 0.025) {
-          this.state = "latched";
-          this.host = best;
-          best.isOccupied = true;
-          this.commitLeft = rand(0.8, 2.0);
-          this.rehomeCooldown = rand(0.4, 1.0);
-        }
-      } else {
-        // wander
-        this.x += (Math.random() - 0.5) * 0.001;
-        this.y += (Math.random() - 0.5) * 0.001;
-      }
     }
 
     detach() {
@@ -411,12 +416,10 @@ class Parasite {
       this.state = "hunting"; 
       this.host = null; 
       this.satiety = 0;
-      this.echoEnv = []; // Fix: Immediately kill audio echo tails on detach
+      this.echoEnv = []; 
     }
 
     step(dt, world) {
-      // Parasites live forever (never despawn). They may re-home opportunistically.
-      // Cooldowns to prevent thrashing
       this.rehomeCooldown = Math.max(0, this.rehomeCooldown - dt);
       this.commitLeft = Math.max(0, this.commitLeft - dt);
       const canConsiderSwitch = (this.rehomeCooldown <= 0 && this.commitLeft <= 0);
@@ -453,38 +456,41 @@ class Parasite {
             this.rehomeCooldown = rand(0.25, 0.6);
           }
         }
-        return;
-      }
-
-      this.state = "hunting";
-      this.host = null;
-      let best = null;
-      let bestScore = -1e9;
-      const R = 0.35;
-      for (const a of world.agents) {
-        if (!a || a.state !== "alive" || a.isOccupied) continue;
-        const d = Math.hypot(a.x - this.x, a.y - this.y);
-        if (d > R) continue;
-        const s = this._scoreHost(a, world);
-        if (s > bestScore) { bestScore = s; best = a; }
-      }
-
-      if (best) {
-        const ang = Math.atan2(best.y - this.y, best.x - this.x);
-        this.heading = lerp(this.heading, ang, 0.05);
-        this.x += Math.cos(this.heading) * 0.003;
-        this.y += Math.sin(this.heading) * 0.003;
-        if (Math.hypot(best.x - this.x, best.y - this.y) < 0.025) {
-          this.state = "latched";
-          this.host = best;
-          best.isOccupied = true;
-          this.commitLeft = rand(0.8, 2.0);
-          this.rehomeCooldown = rand(0.4, 1.0);
-        }
       } else {
-        this.x += (Math.random() - 0.5) * 0.001;
-        this.y += (Math.random() - 0.5) * 0.001;
+        this.state = "hunting";
+        this.host = null;
+        let best = null;
+        let bestScore = -1e9;
+        const R = 0.35;
+        for (const a of world.agents) {
+          if (!a || a.state !== "alive" || a.isOccupied) continue;
+          const d = Math.hypot(a.x - this.x, a.y - this.y);
+          if (d > R) continue;
+          const s = this._scoreHost(a, world);
+          if (s > bestScore) { bestScore = s; best = a; }
+        }
+
+        if (best) {
+          const ang = Math.atan2(best.y - this.y, best.x - this.x);
+          this.heading = lerp(this.heading, ang, 0.05);
+          this.x += Math.cos(this.heading) * 0.003;
+          this.y += Math.sin(this.heading) * 0.003;
+          if (Math.hypot(best.x - this.x, best.y - this.y) < 0.025) {
+            this.state = "latched";
+            this.host = best;
+            best.isOccupied = true;
+            this.commitLeft = rand(0.8, 2.0);
+            this.rehomeCooldown = rand(0.4, 1.0);
+          }
+        } else {
+          this.x += (Math.random() - 0.5) * 0.002;
+          this.y += (Math.random() - 0.5) * 0.002;
+        }
       }
+
+      // FIX: Boundary clamping to prevent disappearing
+      this.x = clamp(this.x, 0.05, 0.95);
+      this.y = clamp(this.y, 0.05, 0.95);
     }
 
     getNodes(t) {
@@ -523,7 +529,6 @@ class Parasite {
     }
 
     _callAndResponse(t, dt, world, lib, fBase) {
-      // Speak only when latched
       if (this.state !== "latched") return null;
       this.talkT -= dt;
       if (this.talkT > 0) return null;
@@ -550,138 +555,198 @@ class Parasite {
       return { hz: target, amp: clamp(ph.amp * rand(0.45, 0.85), 0, 1) };
     }
 
-    audio(t, dt, baseHz, chMult, world) {
-      const fBase = baseHz * (chMult?.[this.id] || (this.id + 1));
+audio(t, dt, baseHz, chMult, world) {
+      // 1. PRIMARY CONTROL ANCHOR (Fix for CH1/CH3 responsiveness)
+      // We check for undefined so that ID 0 (CH1) is correctly recognized
+      const multiplier = (chMult && chMult[this.id] !== undefined) ? chMult[this.id] : (this.id + 1);
+      const fBase = baseHz * multiplier;
 
-      // STRICT AUDIO GATE: Absolute silence if not fully latched to an alive host
+      // 2. DISCONNECT SAFETY
       if (this.state !== "latched" || !this.host || this.host.state !== "alive") {
         this.phase = (this.phase + TAU * fBase * dt) % TAU;
-        this.echoEnv = []; // Safety purge
+        this.echoEnv = []; 
         return { amp: 0, freq: fBase, phase: this.phase };
       }
 
+      // 3. PERSONALITY & TEMPORAL NOISE
       const fam = this.host.speciesId;
       const lib = SOUND_LIB[fam] || SOUND_LIB.flagellate;
+      
+      // localT uses individual timeScale so heartbeats never sync up
+      const localT = t * (this.host.timeScale || 1.0);
       const speed = Math.hypot(this.host.vx || 0, this.host.vy || 0);
       const speedN = clamp(speed / 0.00022, 0, 1);
       const energy = clamp(this.host.energy || 0, 0, 2.0);
 
-      const whisper = 0.04 + 0.18 * clamp(energy, 0, 1);
-      const yell = 0.35 + 0.75 * (0.35 * speedN + 0.65 * clamp(energy, 0, 1));
-      const dyn = lerp(whisper, yell, clamp(energy, 0, 1));
+      // Speed-to-Pitch: Increases register as they move faster
+      const speedPitchMod = 1.0 + (speedN * 0.5);
 
+      // 4. PITCH HOPPING (Logic decoupled from User Sliders)
       this.hopT -= dt;
       if (this.hopT <= 0) {
-        const hopRate = lerp(lib.hopHz[0], lib.hopHz[2], 0.25 + 0.75 * speedN);
+        const hopRate = lerp(lib.hopHz ? lib.hopHz[0] : 0.5, lib.hopHz ? lib.hopHz[2] : 2.0, 0.25 + 0.75 * speedN);
         this.hopT = rand(0.12, 0.55) / Math.max(0.25, hopRate);
         const ratios = lib.ratios || [1, 4/3, 3/2, 2];
-        const s01 = hash01((this.host.seed || 0) * 19.7 + t * 0.35 + this.id * 3.1);
-        const r = ratios[Math.floor(clamp(s01, 0, 0.999999) * ratios.length)];
-        this.targetHz = clamp(fBase * r * lib.regMul, fBase * lib.minMul, fBase * lib.maxMul);
-        if (Math.random() < 0.45) this._triggerEcho(t, lib, clamp(dyn, 0, 1));
+        
+        // Use localT for hash calculation so hop timing is unique per creature
+        const s01 = hash01((this.host.seed || 0) * 19.7 + localT * 0.35 + this.id * 3.1);
+        this.currRatio = ratios[Math.floor(clamp(s01, 0, 0.9999) * ratios.length)];
+
+        if (Math.random() < 0.45) this._triggerEcho(t, lib, 0.4 * energy);
       }
+
+      // 5. INSTANT SLIDER RESPONSE
+      // We calculate targetHz every frame using the live fBase (User Sliders)
+      this.targetHz = fBase * (this.currRatio || 1.0) * (lib.regMul || 1.0) * speedPitchMod;
+      this.targetHz = clamp(this.targetHz, 20, 1500);
 
       const resp = this._callAndResponse(t, dt, world, lib, fBase);
-      if (resp) {
-        this.targetHz = lerp(this.targetHz || fBase, resp.hz, 0.65);
-        this._triggerEcho(t, lib, resp.amp);
-      }
+      if (resp) this.targetHz = lerp(this.targetHz, resp.hz, 0.65);
 
-      if (!this.noteHz || !Number.isFinite(this.noteHz)) this.noteHz = this.targetHz || fBase;
-      this.noteHz = lerp(this.noteHz, this.targetHz || fBase, 0.06 + 0.16 * speedN);
+      if (!this.noteHz || !Number.isFinite(this.noteHz)) this.noteHz = this.targetHz;
+      this.noteHz = lerp(this.noteHz, this.targetHz, (lib.glide || 0.1) + (speedN * 0.1));
 
-      const vibHz = lerp(lib.vibratoHz[0], lib.vibratoHz[1], 0.25 + 0.75 * speedN);
-      const vibAmt = lerp(lib.vibratoAmt[0], lib.vibratoAmt[1], 0.15 + 0.85 * clamp(energy, 0, 1));
-      const vib = 1 + Math.sin(t * TAU * vibHz + (this.host.seed || 0)) * vibAmt;
+      // 6. VIBRATO & ORGANIC JITTER
+      const vibHz = lerp(lib.vibratoHz ? lib.vibratoHz[0] : 1, lib.vibratoHz ? lib.vibratoHz[1] : 5, 0.25 + 0.75 * speedN);
+      const vibAmt = lerp(lib.vibratoAmt ? lib.vibratoAmt[0] : 0.01, lib.vibratoAmt ? lib.vibratoAmt[1] : 0.05, 0.15 + 0.85 * clamp(energy, 0, 1));
+      const vib = 1 + Math.sin(localT * TAU * vibHz + (this.host.seed || 0)) * vibAmt;
 
-      const gate = gateFor(lib, t, speedN, (this.host.seed || 0) + this.id * 11.7);
-      let amp = dyn * gate * clamp(energy, 0, 1.5);
+      const freqJitter = (Math.random() - 0.5) * (lib.grit || 0) * speedN * this.noteHz;
+      const freq = clamp((this.noteHz * vib) + freqJitter, 20, 1500);
+
+      // 7. AMPLITUDE & SPECTRUM FIX
+      const gate = gateFor(lib, localT, speedN, (this.host.seed || 0) + this.id * 11.7);
+      const dyn = lerp(0.04 + 0.18 * energy, 0.35 + 0.75 * energy, speedN);
+      let amp = dyn * gate * energy;
       amp = clamp(amp + this._applyEcho(dt), 0, 1.25);
 
-      const jitter = (Math.random() - 0.5) * (lib.grit || 0) * (0.35 + 0.65 * speedN);
-      if (lib.phaseReset && gate > 1.0 && (t - this.lastClick) > 0.06) {
-        this.lastClick = t;
-        this.phase = rand(0, TAU);
-      }
+      // FIX: Strictly capping visual amplitude at 1.0 for the Chart
+      const finalAmp = clamp(amp * clamp(this.host.energy, 0, 2.0), 0, 1.0);
 
-      const freq = this.noteHz * vib;
-      this.phase = (this.phase + TAU * freq * dt + jitter) % TAU;
-      this.lastPhrase = { amp, hz: freq, t };
+      this.phase = (this.phase + TAU * freq * dt) % TAU;
+      this.lastPhrase = { amp: finalAmp, hz: freq, t };
 
-      return { amp: amp * clamp(this.host.energy, 0, 2.0), freq, phase: this.phase };
+      return { amp: finalAmp, freq, phase: this.phase };
     }
   }
 
-  class Agent {
+class Agent {
     constructor(sid, x, y, isBaby = true) {
-      this.id = Math.random(); this.speciesId = sid; this.profile = SPECIES[sid];
+      this.id = Math.random(); 
+      this.speciesId = sid; 
+      this.profile = SPECIES[sid] || SPECIES.bacteria; 
+      
       this.x = x; this.y = y; this.z = rand(-0.2, 0.2);
       this.vx = 0; this.vy = 0; this.heading = rand(0, TAU);
       this.seed = rand(0, 100); this.state = "alive"; this.isOccupied = false;
-      this.maturity = isBaby ? 0.2 : 1.0;
+      this.maturity = isBaby ? 0.2 : 1.0; 
       this.energy = 1.0; this.health = 1.0; this.age = 0;
-      this.baseRgb = sid === "flagellate" ? [205, 140, 235] : (sid === "bacteria" ? [80, 215, 225] : (sid === "archaea" ? [235, 170, 85] : [145, 225, 175]));
-      this.currRgb = [...this.baseRgb];
-      this.currAlpha = 0; this.r = 0; this.stomach = [];
+
+      // FIX: Individualized Heartbeat
+      this.timeScale = rand(0.7, 1.3); 
+
+      const colors = { 
+        bacteria: [180, 240, 255], archaea: [255, 150, 100], 
+        flagellate: [205, 140, 235], lattice: [145, 255, 175], 
+        mycelium: [170, 120, 255], scintillator: [180, 230, 255] 
+      };
+      this.baseRgb = colors[sid] || [255, 255, 255];
+      this.currRgb = [...this.baseRgb]; this.currAlpha = 0; this.r = 0; this.stomach = [];
     }
+
     absorb(rgb, amt) {
       if (this.stomach.length > 8) this.stomach.shift();
       this.stomach.push({ ox: rand(-0.01, 0.01), oy: rand(-0.01, 0.01), rgb: [...rgb], a: 0.6, p: rand(0, TAU) });
       this.energy = clamp(this.energy + amt * 0.6, 0, 2.0);
     }
+
     step(dt, world) {
       this.age += dt;
       if (this.state === "dying") {
-        this.vx *= 0.85; this.vy *= 0.85; this.z = lerp(this.z, -1.0, dt * 0.4);
+        this.vx *= 0.85; this.vy *= 0.85; 
+        this.z = lerp(this.z, -1.0, dt * 0.4);
         this.currAlpha = lerp(this.currAlpha, 0, dt * 0.2);
-        this.currRgb = this.currRgb.map(c => lerp(c, 40, dt * 0.4));
-        if (this.currAlpha < 0.01) this.state = "dead"; return;
+        if (this.currAlpha < 0.01) this.state = "dead"; 
+        return;
       }
+
       this.maturity = clamp(this.maturity + dt * 0.015, 0.2, 1.0);
-      this.r = this.profile.coreRadius * this.maturity;
+      this.r = (this.profile?.coreRadius || 0.01) * this.maturity;
       this.currAlpha = lerp(this.currAlpha, 0.85, dt);
+
       let targetHeading = this.heading;
       const preyFamily = PREY_MAP[this.speciesId];
       let closestInterest = null; let minDist = 0.3;
-      if (this.energy < 0.4 && this.maturity > 0.6) {
-        for (const a of world.agents) {
-          if (a.speciesId === preyFamily && a.state === "alive") {
-            const d = Math.hypot(a.x - this.x, a.y - this.y);
-            if (d < minDist) { minDist = d; closestInterest = a; }
-          }
+
+      for (const a of world.agents) {
+        if (a.speciesId === preyFamily && a.state === "alive") {
+          const d = Math.hypot(a.x - this.x, a.y - this.y);
+          if (d < minDist) { minDist = d; closestInterest = a; }
         }
       }
+
       if (!closestInterest) {
         for (const b of world.blobs) {
-          if (this.profile.prefs.includes(b.nutrientId)) {
+          if (this.profile?.prefs.includes(b.nutrientId)) {
             const d = Math.hypot(b.x - this.x, b.y - this.y);
             if (d < minDist) { minDist = d; closestInterest = b; }
           }
         }
       }
+
       if (closestInterest) {
         targetHeading = Math.atan2(closestInterest.y - this.y, closestInterest.x - this.x);
         if (minDist < this.r + 0.015) {
-          if (closestInterest instanceof NutrientBlob) this.absorb(closestInterest.profile.tint, closestInterest.consume(dt * 0.2));
-          else { this.absorb(closestInterest.currRgb, 0.5); closestInterest.health = 0; }
+          if (closestInterest instanceof NutrientBlob) {
+            this.absorb(closestInterest.profile.tint, closestInterest.consume(dt * 0.2));
+          } else { 
+            this.absorb(closestInterest.currRgb, 0.5); closestInterest.health = 0; 
+          }
         }
-      } else { this.heading += (Math.random() - 0.5) * this.profile.wander; }
-      if (this.energy > 1.8 && this.maturity > 0.9 && world.agents.length < 60) {
-        this.energy = 0.7; world.agents.push(new Agent(this.speciesId, this.x + rand(-0.01, 0.01), this.y + rand(-0.01, 0.01), true));
+      } else { 
+        this.heading += (Math.random() - 0.5) * (this.profile?.wander || 0.02); 
       }
+      
+      // FIX: STRONG CIRCULAR CONTAINMENT
+      const distFromCenter = Math.hypot(this.x - 0.5, this.y - 0.5);
+      if (distFromCenter > 0.43) {
+        const angleToCenter = Math.atan2(0.5 - this.y, 0.5 - this.x);
+        // Forcefully steer back and dampen velocity to prevent "glitching" out
+        this.heading = lerp(this.heading, angleToCenter, (distFromCenter - 0.43) * 5.0);
+        this.vx *= 0.9; 
+        this.vy *= 0.9;
+      }
+      
+      if (this.energy > 1.8 && this.maturity > 0.9 && world.agents.length < 60) {
+        this.energy = 0.7; 
+        world.agents.push(new Agent(this.speciesId, this.x + rand(-0.01, 0.01), this.y + rand(-0.01, 0.01), true));
+      }
+      
       let hDiff = targetHeading - this.heading;
       while (hDiff < -Math.PI) hDiff += TAU; while (hDiff > Math.PI) hDiff -= TAU;
-      this.heading += hDiff * this.profile.turn;
-      const metabolicMult = 0.25 + (this.energy * 0.75);
-      this.vx += Math.cos(this.heading) * this.profile.speed * metabolicMult;
-      this.vy += Math.sin(this.heading) * this.profile.speed * metabolicMult;
-      this.vx *= this.profile.drag; this.vy *= this.profile.drag;
-      this.x = clamp(this.x + this.vx, 0.02, 0.98); this.y = clamp(this.y + this.vy, 0.02, 0.98);
-      if (Math.hypot(this.x - 0.5, this.y - 0.5) > 0.43) this.heading = lerp(this.heading, Math.atan2(0.5 - this.y, 0.5 - this.x), 0.1);
-      this.stomach.forEach(m => { m.p += dt * 4; m.ox = Math.sin(m.p) * this.r * 0.5; m.oy = Math.cos(m.p) * this.r * 0.5; });
+      this.heading += hDiff * (this.profile?.turn || 0.01);
+
+      // Movement influenced by individual timeScale
+      const metabolicMult = (0.25 + (this.energy * 0.75)) * this.timeScale;
+      const speed = this.profile?.speed || 0.0001;
+      this.vx += Math.cos(this.heading) * speed * metabolicMult;
+      this.vy += Math.sin(this.heading) * speed * metabolicMult;
+      this.vx *= (this.profile?.drag || 0.95); 
+      this.vy *= (this.profile?.drag || 0.95);
+
+      this.x = clamp(this.x + this.vx, 0.01, 0.99); 
+      this.y = clamp(this.y + this.vy, 0.01, 0.99);
+
+      this.stomach.forEach(m => { 
+        m.p += dt * 4 * this.timeScale; 
+        m.ox = Math.sin(m.p) * this.r * 0.5; 
+        m.oy = Math.cos(m.p) * this.r * 0.5; 
+      });
+
       this.energy -= dt * 0.007; this.health -= dt * 0.002;
       if (this.energy <= 0.05 || this.health <= 0 || this.age > 180) this.state = "dying";
-      this.z = lerp(this.z, Math.sin(world.t * 0.3 + this.id) * 0.5, 0.02);
+
+      this.z = lerp(this.z, Math.sin(world.t * 0.3 * this.timeScale + this.id) * 0.5, 0.02);
     }
   }
 
@@ -700,10 +765,6 @@ class World {
       this.caretaker = { id: "gardener", enabled: true, influence: 1.0, t: 0 };
     }
 
-    /**
-     * Patched Init: Ensures agents exist and parasites are reset 
-     * before the engine starts ticking to prevent the "frozen" bug.
-     */
     init(canvas, getParamsFn) {
       this.canvas = canvas; 
       this.ctx = canvas.getContext("2d"); 
@@ -713,23 +774,20 @@ class World {
       this.blobs = []; 
       this.spores = [];
       
-      // 1. Populate agents first so parasites have valid targets immediately
       const keys = Object.keys(SPECIES);
       for (let i = 0; i < 36; i++) {
         this.agents.push(new Agent(keys[i % keys.length], rand(0.2, 0.8), rand(0.2, 0.8), false));
       }
       
-      // 2. Explicitly reset Parasites so they start fresh hunting logic on frame 1
       this.parasites.forEach(p => {
-        p.detach(); // Clears host and resets state to "hunting"
+        p.detach(); 
         p.x = rand(0.3, 0.7);
         p.y = rand(0.3, 0.7);
       });
 
       this.enabled = true;
-      this.t = 0; // Reset internal clock
+      this.t = 0; 
 
-      // 3. Inject CSS to hide standard control cursors while in Biome mode
       const styleId = "biome-ui-fix";
       if (!document.getElementById(styleId)) {
         const s = document.createElement('style'); s.id = styleId;
@@ -744,13 +802,11 @@ class World {
       this.t += safeDt;
       this.caretaker.t += safeDt;
 
-      // Caretaker spawning logic
       if (this.caretaker.enabled && this.caretaker.t > (4.5 / this.caretaker.influence)) {
         this.caretaker.t = 0; 
         this.spawnNutrientByRecipe();
       }
 
-      // Update world objects
       this.blobs.forEach(b => b.step(safeDt)); 
       this.blobs = this.blobs.filter(b => !b.dead);
       
@@ -762,12 +818,12 @@ class World {
       
       this.parasites.forEach(p => p.step(safeDt, this));
 
-      // Population maintenance
-      if (this.agents.length < 24) {
-        this.agents.push(new Agent(Object.keys(SPECIES)[Math.floor(rand(0, 4))], rand(0.4, 0.6), rand(0.4, 0.6), true));
+      if (this.agents.length < 32) {
+        const keys = Object.keys(SPECIES);
+        const randomSpecies = keys[Math.floor(rand(0, keys.length))];
+        this.agents.push(new Agent(randomSpecies, rand(0.3, 0.7), rand(0.3, 0.7), true));
       }
 
-      // Bridge to Audio Output
       const pD = this.getParams();
       this.parasites.forEach((p, i) => {
         const mod = p.audio(this.t, safeDt, pD.baseHz, pD.chMult, this);
@@ -778,16 +834,33 @@ class World {
     }
 
     spawnNutrientByRecipe() {
-      const recipes = { 
-        gardener: ["sugar", "water", "carbon"], 
-        bloom: ["sugar", "sugar", "water"], 
-        ballast: ["salt", "carbon", "carbon"], 
-        ironbeat: ["iron", "iron", "water"], 
-        sulfuric: ["sulfur", "iron", "sugar"], 
-        drifter: ["water", "carbon", "water"] 
-      };
-      const list = recipes[this.caretaker.id] || recipes.gardener;
-      this.blobs.push(new NutrientBlob(Math.random(), list[Math.floor(rand(0, list.length))], rand(0.3, 0.7), rand(0.3, 0.7), 1.2));
+      const cId = this.caretaker.id || "gardener";
+      const diet = CARETAKER_DIETS[cId] || CARETAKER_DIETS.gardener;
+      const allNutrientKeys = Object.keys(NUTRIENTS);
+      
+      let pool = [];
+      let totalWeight = 0;
+
+      allNutrientKeys.forEach(key => {
+        let weight = 1 + (diet[key] || 0);
+        pool.push({ id: key, w: weight });
+        totalWeight += weight;
+      });
+
+      let threshold = Math.random() * totalWeight;
+      let selectedId = allNutrientKeys[0];
+
+      for (const item of pool) {
+        if (threshold < item.w) {
+          selectedId = item.id;
+          break;
+        }
+        threshold -= item.w;
+      }
+
+      const x = rand(0.3, 0.7);
+      const y = rand(0.3, 0.7);
+      this.blobs.push(new NutrientBlob(Math.random(), selectedId, x, y, 1.2));
     }
 
     render() {
@@ -795,12 +868,10 @@ class World {
       const { offCtx, off, ctx, canvas } = this; 
       const ow = off.width;
 
-      // Draw background
       offCtx.globalCompositeOperation = "source-over"; 
       offCtx.fillStyle = "rgb(19, 29, 41)"; 
       offCtx.fillRect(0, 0, ow, ow);
 
-      // Collect all visible nodes
       const allNodes = [];
       this.blobs.forEach(b => allNodes.push(...b.getNodes(this.t)));
       this.agents.forEach(a => {
@@ -812,7 +883,6 @@ class World {
       });
       this.parasites.forEach(p => allNodes.push(...p.getNodes(this.t)));
 
-      // Render nodes with depth sorting (Z-Index)
       offCtx.globalCompositeOperation = "lighter";
       allNodes.sort((a, b) => a.z - b.z).forEach(n => {
         const df = Math.abs(n.z); 
@@ -822,7 +892,6 @@ class World {
         drawGaussianSplat(offCtx, n.x * ow, n.y * ow, r, n.rgb, alpha, softness);
       });
 
-      // Composite to main canvas
       const cw = canvas.width; 
       ctx.setTransform(1, 0, 0, 1, 0, 0); 
       ctx.fillStyle = "black"; 
@@ -836,7 +905,6 @@ class World {
       ctx.imageSmoothingEnabled = true; 
       ctx.drawImage(off, 0, 0, ow, ow, 0, 0, cw, cw);
 
-      // Draw Parasite HUD indicators
       this.parasites.forEach(p => {
         const px = p.x * cw, py = p.y * cw; 
         ctx.beginPath(); 
@@ -852,7 +920,6 @@ class World {
         ctx.fill();
       });
 
-      // Vignette effect
       const vg = ctx.createRadialGradient(cw/2, cw/2, cw*0.2, cw/2, cw/2, cw*0.5);
       vg.addColorStop(0, "transparent"); 
       vg.addColorStop(1, "rgba(0,0,0,0.85)");
@@ -887,4 +954,49 @@ class World {
       engine.caretaker.influence = clamp(v / 100, 0.1, 5.0);
     }
   };
+
+  /** 
+   * SPECIES DEFINITIONS (v8.0 EXTENSION) 
+   * These were placed here to ensure SPECIES object is fully formed.
+   */
+  SPECIES.mycelium = {
+    name: "Hairy Blobs", speed: 0.00004, turn: 0.01, wander: 0.01, drag: 0.98,
+    coreRadius: 0.022, prefs: ["carbon", "sulfur"], reproduction: "spores",
+    makeNodes(a, t) {
+      const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.3 }];
+      if (a.state === "alive") {
+        const localT = t * a.timeScale;
+        // Reduced node count and softness to prevent the "smear ring"
+        for (let i = 0; i < 14; i++) {
+          const ang = (i / 14) * TAU + Math.sin(localT * 4 + i);
+          // Hairs now vary in length and are anchored to the core
+          const hairLen = a.r * (1.1 + Math.sin(localT * 5 + i * 2) * 0.4);
+          const [dx, dy] = rotate2(hairLen, 0, ang);
+          
+          // Draw hairs as two nodes to create a "line" look
+          ns.push({ x: a.x + dx * 0.5, y: a.y + dy * 0.5, z: a.z, r: a.r * 0.2, rgb: a.currRgb, a: a.currAlpha * 0.5, s: 0.2 });
+          ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.15, rgb: a.currRgb, a: a.currAlpha * 0.3, s: 0.1 });
+        }
+      }
+      return ns;
+    }
+  };
+
+  SPECIES.scintillator = {
+    name: "Abyssal Pulsars", speed: 0.0002, turn: 0.1, wander: 0.08, drag: 0.92,
+    coreRadius: 0.012, prefs: ["iron", "water"], reproduction: "mitosis",
+    makeNodes(a, t) {
+      const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: [180, 230, 255], a: a.currAlpha, s: 0.05 }];
+      if (a.state === "alive") {
+        const pulse = Math.sin(t * 10 + a.seed) * 0.5 + 0.5;
+        for (let i = 0; i < 8; i++) {
+          const tailAng = a.heading + Math.PI + (i-3.5) * 0.2;
+          const [dx, dy] = rotate2(a.r * (1.5 + pulse * 0.5), 0, tailAng);
+          ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.4, rgb: a.currRgb, a: a.currAlpha * 0.2, s: 0.6 });
+        }
+      }
+      return ns;
+    }
+  };
+
 })();

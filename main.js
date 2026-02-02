@@ -878,7 +878,7 @@ function cycleRouteValue(v, options){
     applied.touchAmpLow = expSlew(applied.touchAmpLow, t.touchAmpLow, dt, 0.25);
     applied.touchAmpHigh = expSlew(applied.touchAmpHigh, t.touchAmpHigh, dt, 0.25);
     
-    // --- Biome audio override ---
+// --- Biome audio override ---
     if (APP_MODE === "biome" && window.BiomeEngine && typeof window.BiomeEngine.getAudioOutputs === "function") {
       try {
         if (visCursorFreq) visCursorFreq.style.display = "none";
@@ -892,14 +892,18 @@ function cycleRouteValue(v, options){
         if (bioAmp && bioFreq && bioPhase) {
           for (let i = 0; i < 4; i++) {
             const cap = Math.max(1e-6, maxCap[i] || 1);
-            const targetAmp = clamp((bioAmp[i] || 0) * applied.master * applied.ampTrim[i], 0, cap);
-            const targetFreq = clamp((bioFreq[i] || (applied.baseHz * (i + 1))), FMIN, FMAX);
-            const targetPhase = (bioPhase[i] != null) ? bioPhase[i] : applied.phaseRad[i];
+            
+            // RAW intensity for visuals
+            const rawAmp = (bioAmp[i] || 0) * applied.master * applied.ampTrim[i];
+            // CAPPED intensity for hardware
+            const targetAmp = clamp(rawAmp, 0, cap);
 
-            applied.ampReq[i] = expSlew(applied.ampReq[i], targetAmp, dt, 0.04);
+            // Change: Use rawAmp for Req (visuals) and targetAmp for Eff (hardware)
+            applied.ampReq[i] = expSlew(applied.ampReq[i], rawAmp, dt, 0.04);
             applied.ampEff[i] = expSlew(applied.ampEff[i], targetAmp, dt, 0.04);
-            applied.freqHz[i] = expSlew(applied.freqHz[i], targetFreq, dt, 0.08);
-            applied.phaseRad[i] = expSlew(applied.phaseRad[i], targetPhase, dt, 0.06);
+            
+            applied.freqHz[i] = expSlew(applied.freqHz[i], clamp((bioFreq[i] || (applied.baseHz * (i + 1))), FMIN, FMAX), dt, 0.08);
+            applied.phaseRad[i] = expSlew(applied.phaseRad[i], (bioPhase[i] != null) ? bioPhase[i] : applied.phaseRad[i], dt, 0.06);
 
             const targetPhaseDeg = (applied.phaseRad[i] * 180 / Math.PI) % 360;
             applied.phaseDeg[i] = expSlew(applied.phaseDeg[i], targetPhaseDeg, dt, 0.10);
@@ -989,7 +993,8 @@ function cycleRouteValue(v, options){
       const targetPhaseDeg = applied.phaseDeg[i] + phaseShiftDeg + applied.cycleAccumDeg[i];
 
       // Target amplitude (clamped by maxCap)
-      const reqAmp = (applied.master * applied.ampTrim[i] * ampScale);
+      const spatialWeight = w[i] * 4; 
+      const reqAmp = (applied.master * applied.ampTrim[i] * ampScale * spatialWeight);
       applied.ampReq[i] = expSlew(applied.ampReq[i], reqAmp, dt, 0.04);
       const targetAmp = clamp(reqAmp, 0, maxCap[i]);
 
@@ -1068,7 +1073,7 @@ function cycleRouteValue(v, options){
     const chColors = ["rgba(0,170,255,0.7)", "rgba(255,80,80,0.7)", "rgba(80,255,140,0.7)", "rgba(255,210,80,0.7)"];
 
     for (let i = 0; i < 4; i++) {
-      const amp = applied.ampEff[i];
+      const amp = applied.ampReq[i];
       if (amp < 0.005) continue;
       const centerX = getX(applied.freqHz[i]);
       const peakH = amp * h * 0.75;
