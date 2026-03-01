@@ -29,14 +29,14 @@
   <main id="mainGrid">
     <section id="controlsPanel" class="panel">
       <section id="globalPanel" class="subpanel">
-        <div class="control-group" phaseControl>
+        <div class="control-group">
           <div class="label-row">
             <label for="masterVol" class="click-reset" id="masterVolLabel">Master Volume <span id="masterVolVal">0%</span></label>
           </div>
           <input type="range" id="masterVol" min="0" max="1" step="0.01" value="0" />
         </div>
 
-        <div class="control-group" phaseCycleControl>
+        <div class="control-group">
           <div class="label-row">
             <label for="baseFreqSlider" class="click-reset" id="baseFreqLabel">Base Frequency <span id="baseFreqVal">200</span> Hz</label>
           </div>
@@ -51,14 +51,14 @@
             <div class="chTitle ch1">Primary A (CH1)</div>
             <div id="devBadge1" class="devBadge">Disconnected</div>
           </div>
-          <div class="control-group" phaseControl>
+          <div class="control-group">
             <div class="label-row">
               <label for="amp1" class="click-reset">Amplitude <span id="amp1Val">0%</span></label>
               <button id="max_amp1" class="snap-pill max-pill" type="button">Max 0%</button>
             </div>
             <input type="range" id="amp1" min="0" max="1" step="0.01" value="0" />
           </div>
-          <div class="control-group" phaseCycleControl>
+          <div class="control-group">
             <div class="label-row">
               <label for="freqMultiplier1" class="click-reset">Frequency Multiplier <span id="mult1Val">1x</span></label>
               <button id="snap_mult1" class="snap-pill on" type="button">Snap</button>
@@ -86,28 +86,28 @@
             <div class="chTitle ch2">Primary B (CH2)</div>
             <div id="devBadge2" class="devBadge">Disconnected</div>
           </div>
-          <div class="control-group" phaseControl>
+          <div class="control-group">
             <div class="label-row">
               <label for="amp2" class="click-reset">Amplitude <span id="amp2Val">0%</span></label>
               <button id="max_amp2" class="snap-pill max-pill" type="button">Max 0%</button>
             </div>
             <input type="range" id="amp2" min="0" max="1" step="0.01" value="0" />
           </div>
-          <div class="control-group" phaseCycleControl>
+          <div class="control-group">
             <div class="label-row">
               <label for="freqMultiplier2" class="click-reset">Frequency Multiplier <span id="mult2Val">1x</span></label>
               <button id="snap_mult2" class="snap-pill on" type="button">Snap</button>
             </div>
             <input type="range" id="freqMultiplier2" min="1" max="6" step="0.01" value="1" />
           </div>
-          <div class="control-group">
+          <div class="control-group" phaseControl>
             <div class="label-row">
               <label for="phase2" class="click-reset">Phase <span id="phase2Val">0°</span></label>
               <button id="snap_phase2" class="snap-pill on" type="button">Snap</button>
             </div>
             <input type="range" id="phase2" min="0" max="360" step="1" value="0" />
           </div>
-          <div class="control-group">
+          <div class="control-group" phaseCycleControl>
             <div class="label-row">
               <label for="phaseCycle2" class="click-reset">Phase Cycle <span id="cycle2Val">0°/s</span></label>
               <button id="snap_cycle2" class="snap-pill on" type="button">Snap</button>
@@ -135,14 +135,14 @@
             </div>
             <input type="range" id="freqMultiplier3" min="1" max="6" step="0.01" value="1" />
           </div>
-          <div class="control-group">
+          <div class="control-group" phaseControl>
             <div class="label-row">
               <label for="phase3" class="click-reset">Phase <span id="phase3Val">0°</span></label>
               <button id="snap_phase3" class="snap-pill on" type="button">Snap</button>
             </div>
             <input type="range" id="phase3" min="0" max="360" step="1" value="0" />
           </div>
-          <div class="control-group">
+          <div class="control-group" phaseCycleControl>
             <div class="label-row">
               <label for="phaseCycle3" class="click-reset">Phase Cycle <span id="cycle3Val">0°/s</span></label>
               <button id="snap_cycle3" class="snap-pill on" type="button">Snap</button>
@@ -170,14 +170,14 @@
             </div>
             <input type="range" id="freqMultiplier4" min="1" max="6" step="0.01" value="1" />
           </div>
-          <div class="control-group">
+          <div class="control-group" phaseControl>
             <div class="label-row">
               <label for="phase4" class="click-reset">Phase <span id="phase4Val">0°</span></label>
               <button id="snap_phase4" class="snap-pill on" type="button">Snap</button>
             </div>
             <input type="range" id="phase4" min="0" max="360" step="1" value="0" />
           </div>
-          <div class="control-group">
+          <div class="control-group" phaseCycleControl>
             <div class="label-row">
               <label for="phaseCycle4" class="click-reset">Phase Cycle <span id="cycle4Val">0°/s</span></label>
               <button id="snap_cycle4" class="snap-pill on" type="button">Snap</button>
@@ -220,6 +220,7 @@
             <option value="gardener">The Gardener</option>
           </select>
           <button id="caretakerBtn" class="mode-btn">Start</button>
+          <button id="randomCaretakerBtn" class="mode-btn random-caretaker-btn" title="Randomly switch caretaker every 1–3 minutes">🎲 Random</button>
         </div>
         <div class="slider-row">
           <label class="slider-label">Caretaker Influence <span id="caretakerIntensityValInline">100%</span></label>
@@ -229,6 +230,51 @@
       </div>
     </section>
 
+
+    <!-- DAC settings — visible only when one or both slots have a DAC connected -->
+    <section id="dacSettingsPanel" class="subpanel" style="display:none">
+      <div class="panelTitle">DAC Settings</div>
+
+      <!-- Primary slot settings (CH1 → L, CH2 → R) -->
+      <div id="primaryDacSettings" class="dac-slot-settings" style="display:none">
+        <div class="dac-slot-title">Primary &mdash; CH1 / CH2</div>
+        <div class="dac-row">
+          <label class="dac-label" for="primaryDacWaveform">Waveform</label>
+          <select id="primaryDacWaveform" class="dac-select">
+            <option value="0">Sine — smooth</option>
+            <option value="1">Triangle — sharper</option>
+            <option value="2">Square — intense</option>
+          </select>
+        </div>
+        <div class="dac-row dac-eq-row">
+          <label class="dac-label" for="primaryDacEQ">S-D Compensation</label>
+          <div class="dac-eq-control">
+            <input type="checkbox" id="primaryDacEQ" class="dac-chk" checked />
+            <span class="dac-eq-hint">Disable if device does DSP internally</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Secondary slot settings (CH3 → L, CH4 → R) -->
+      <div id="secondaryDacSettings" class="dac-slot-settings" style="display:none">
+        <div class="dac-slot-title">Secondary &mdash; CH3 / CH4</div>
+        <div class="dac-row">
+          <label class="dac-label" for="secondaryDacWaveform">Waveform</label>
+          <select id="secondaryDacWaveform" class="dac-select">
+            <option value="0">Sine — smooth</option>
+            <option value="1">Triangle — sharper</option>
+            <option value="2">Square — intense</option>
+          </select>
+        </div>
+        <div class="dac-row dac-eq-row">
+          <label class="dac-label" for="secondaryDacEQ">S-D Compensation</label>
+          <div class="dac-eq-control">
+            <input type="checkbox" id="secondaryDacEQ" class="dac-chk" checked />
+            <span class="dac-eq-hint">Disable if device does DSP internally</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section id="touchPanel" class="subpanel">
       <div class="panelTitle">Touch Controls</div>
@@ -301,6 +347,17 @@
 </div>
 
 
+<dialog id="connectDialog">
+  <h3 class="dlg-title" id="connectDialogTitle">Connect Primary</h3>
+  <p class="connect-hint">Choose a device type:</p>
+  <div id="connectDeviceList" class="connect-device-list">
+    <!-- Populated dynamically -->
+  </div>
+  <div class="dlg-actions" style="margin-top:14px;">
+    <button id="connectCancel" class="mode-btn">Cancel</button>
+  </div>
+</dialog>
+
 <dialog id="safetyDialog">
   <h3 class="dlg-title">Important Safety Notice</h3>
   <div class="dlg-text" style="line-height:1.35;">
@@ -316,58 +373,98 @@
   </div>
 </dialog>
 
-<dialog id="guideDialog">
-  <h3 class="dlg-title">User Guide</h3>
-  <div class="dlg-text" style="line-height:1.4;">
+<dialog id=”guideDialog”>
+  <h3 class=”dlg-title”>User Guide</h3>
+  <div class=”dlg-text” style=”line-height:1.5;”>
+
     <p><strong>Getting started</strong></p>
     <ol>
-      <li>Click <strong>Connect Primary</strong> to pair the first device (controls CH1/CH2). Click <strong>Connect Secondary</strong> to pair the second device (controls CH3/CH4).</li>
-      <li>Set a <strong>Max</strong> limit for each channel you plan to use. Output is safety‑gated: <strong>no signal will start until at least one channel Max is above 0%</strong>.</li>
-      <li>Bring up <strong>Master Volume</strong> slowly. Use <strong>STOP</strong> to immediately set Master to 0 and center the touch cursors.</li>
-      <li>Optionally toggle <strong>Monitor</strong> to hear a preview mix in your speakers/headphones.</li>
+      <li>Click <strong>Connect Primary</strong> or <strong>Connect Secondary</strong> — a picker will appear listing available Bluetooth Coyote devices and USB audio outputs (DACs). Primary controls CH1&nbsp;/&nbsp;CH2; Secondary controls CH3&nbsp;/&nbsp;CH4.</li>
+      <li>Set a <strong>Max</strong> limit for each channel you plan to use. Output is safety‑gated: <strong>no signal starts until at least one channel Max is above 0%</strong>.</li>
+      <li>Bring up <strong>Master Volume</strong> slowly. Use <strong>STOP</strong> to immediately set Master to 0 and center all cursors.</li>
+      <li>Optionally toggle <strong>Monitor</strong> to hear a preview mix through your speakers or headphones.</li>
     </ol>
+
+    <p><strong>Connecting devices</strong></p>
+    <ul>
+      <li><strong>Bluetooth (DG-LAB Coyote V2/V3)</strong> — select from the browser’s Bluetooth picker. Channels pulse sequentially (never simultaneously).</li>
+      <li><strong>USB DAC / audio output</strong> — select any audio output device. The app synthesises a stereo signal: Left = odd channel, Right = even channel. Primary slot drives CH1 (L) and CH2 (R); Secondary drives CH3 (L) and CH4 (R).</li>
+    </ul>
+
+    <p><strong>DAC settings</strong></p>
+    <ul>
+      <li><strong>Waveform</strong> — choose the carrier shape sent to the DAC: Sine, Triangle, Square, or Sawtooth.</li>
+      <li><strong>S‑D Compensation</strong> — applies a Strength‑Duration curve correction so higher frequencies feel consistent in intensity. Leave <em>on</em> for most devices; turn <em>off</em> if your device already applies DSP internally.</li>
+      <li><strong>Phase &amp; Phase Cycle</strong> controls are only shown when a DAC slot is active. They offset or continuously rotate a channel’s phase — useful for creating stereo sweep effects between the two channels of a pair.</li>
+    </ul>
 
     <p><strong>Channel controls</strong></p>
     <ul>
-      <li><strong>Amplitude</strong> is the “trim” inside the safety cap. The actual output is bounded by the channel’s <strong>Max</strong>.</li>
-      <li><strong>Frequency Multiplier</strong> scales the base frequency per channel.</li>
-      <li><strong>Phase</strong> offsets a channel relative to the others.</li>
-      <li><strong>Phase Cycle</strong> continuously rotates a channel’s phase over time.</li>
+      <li><strong>Amplitude</strong> — the per-channel trim, bounded by that channel’s <strong>Max</strong> safety cap.</li>
+      <li><strong>Frequency Multiplier</strong> — scales Base Frequency independently per channel.</li>
+      <li><strong>Phase</strong> — static offset relative to the other channels (DAC only).</li>
+      <li><strong>Phase Cycle</strong> — continuously rotates phase over time (DAC only).</li>
     </ul>
 
     <p><strong>Touch / Vis pad</strong></p>
     <ul>
-      <li>The pad controls two “sticks”: one biases <strong>frequency/phase</strong>, the other biases <strong>amplitude</strong>.</li>
-      <li>Drag to steer the effect toward corners (channels). Release to ease back to center.</li>
+      <li>Controls two virtual sticks: one biases <strong>frequency &amp; phase</strong>, the other biases <strong>amplitude</strong>.</li>
+      <li>Drag toward a corner to emphasise that channel. Release to ease back to centre.</li>
     </ul>
 
     <p><strong>Motion scripts</strong></p>
     <ul>
-      <li>Select a script and press <strong>Start</strong> to animate the pad automatically.</li>
-      <li><strong>Script Intensity</strong> scales how far the motion reaches. Keep Max caps conservative.</li>
-      <li>Press <strong>Stop</strong> (script) to return control to you.</li>
+      <li>Select a script and press <strong>Start</strong> to animate the pad automatically through parametric or keyframe paths.</li>
+      <li><strong>Script Intensity</strong> scales how far the motion reaches — keep Max caps conservative.</li>
+    </ul>
+
+    <p><strong>Biome mode</strong></p>
+    <p style=”margin:2px 0 6px;”>Switch to <strong>Mode: Biome</strong> to enter an autonomous deep-sea ecosystem. Four <em>Parasites</em> (the coloured rings) hunt creatures and latch on — each latched Parasite drives one audio channel based on that creature’s unique sensation character.</p>
+    <ul>
+      <li><strong>Jellyfish</strong> — slow rolling ocean swells (wave)</li>
+      <li><strong>Radiolarians</strong> — lub‑dub heartbeat double‑pulse</li>
+      <li><strong>Siphonophores</strong> — smooth silky continuous stroke</li>
+      <li><strong>Polychaetes</strong> — deep rhythmic power thrust</li>
+      <li><strong>Nudibranchs</strong> — liquid double‑harmonic swell</li>
+      <li><strong>Glass Squids</strong> — rapid electric buzz with AM envelope</li>
+      <li><strong>Ctenophores</strong> — expanding concentric ring ripples</li>
+      <li><strong>Mantis Shrimp</strong> — quick‑quick‑<em>STRONG</em> gallop punch</li>
+      <li><strong>Pyrosomes</strong> — very slow tease that climbs but never fully releases</li>
+      <li><strong>Sea Angels</strong> — delicate paired wing‑beat flutter with rest</li>
+    </ul>
+    <p style=”margin:4px 0 2px;”><em>ADSR drift:</em> each individual creature slowly evolves its own envelope timing over time, so no two of the same species ever feel identical.</p>
+
+    <p><strong>Caretaker</strong></p>
+    <ul>
+      <li>The Caretaker feeds nutrients into the ecosystem, shaping which species thrive and therefore which sensations dominate.</li>
+      <li>Press <strong>Start</strong> to activate the selected Caretaker; press again to stop.</li>
+      <li>Press <strong>🎲 Random</strong> to enter Random mode — the app automatically switches to a different Caretaker every 1–3 minutes, keeping the experience unpredictable. Press again to stop.</li>
+      <li><strong>Caretaker Influence</strong> controls how frequently nutrients are dropped — higher = faster ecosystem shifts.</li>
+      <li>Six Caretakers to choose from: <strong>Newton</strong> (growth &amp; blending), <strong>Curie</strong> (bloom &amp; spice), <strong>Faraday</strong> (stability &amp; depth), <strong>Feynman</strong> (rhythm &amp; iron), <strong>Darwin</strong> (complexity &amp; sulfur), <strong>Gauss</strong> (drift &amp; water).</li>
     </ul>
 
     <p><strong>Game controller (standard Gamepad API)</strong></p>
     <ul>
-      <li><strong>Right stick</strong>: frequency/phase pad</li>
-      <li><strong>Left stick</strong>: amplitude pad</li>
-      <li><strong>Start</strong>: STOP (master to 0)</li>
-      <li><strong>L1/R1</strong>: nudge Master down/up</li>
-      <li><strong>L2/R2</strong>: nudge Base Frequency down/up</li>
-      <li><strong>X / Y / A / B</strong>: select active channel (your build swaps X↔Y and A↔B to target opposite channels)</li>
-      <li><strong>D‑pad</strong>: adjust selected channel (Up/Down amplitude, Left/Right multiplier)</li>
-      <li><strong>Paddles</strong> (or L3/R3 fallback): nudge phase left/right</li>
+      <li><strong>Right stick</strong> — frequency / phase pad</li>
+      <li><strong>Left stick</strong> — amplitude pad</li>
+      <li><strong>Start</strong> — STOP (master to 0)</li>
+      <li><strong>L1 / R1</strong> — nudge Master Volume down / up</li>
+      <li><strong>L2 / R2</strong> — nudge Base Frequency down / up</li>
+      <li><strong>X / Y / A / B</strong> — select active channel</li>
+      <li><strong>D‑pad</strong> — adjust selected channel (Up/Down amplitude, Left/Right multiplier)</li>
+      <li><strong>Paddles / L3 / R3</strong> — nudge phase left / right</li>
     </ul>
 
     <p><strong>Tips</strong></p>
     <ul>
-      <li>Start low, increase slowly, and set Max caps first.</li>
-      <li>Disconnect devices in-app before powering them off (recommended).</li>
+      <li>Always set <strong>Max</strong> caps before raising Master Volume.</li>
+      <li>In Biome mode, let the ecosystem run for a few minutes before adjusting — species populations shift naturally and so do the sensations.</li>
+      <li>Disconnect devices in‑app before powering them off.</li>
     </ul>
+
   </div>
-  <div class="dlg-actions">
-    <button id="guideClose" class="mode-btn">Close</button>
+  <div class=”dlg-actions”>
+    <button id=”guideClose” class=”mode-btn”>Close</button>
   </div>
 </dialog>
 <dialog id="maxDialog">
@@ -431,6 +528,6 @@
   <!-- Move the STOP button here, and ONLY load the scripts once -->
   <button id="stopBtn" class="mode-btn stop-btn">STOP</button>
   <script src="biome_engine.js?v=5"></script>
-  <script src="main.js?v=200"></script>
+  <script src="main.js?v=205"></script>
 </body>
 </html>

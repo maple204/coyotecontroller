@@ -588,16 +588,37 @@ body:not([data-mode="biome"]) #biomePanel { display:none !important; }
 }
 
 
-/* --- Biome: caretakers only (no manual feed, no start/stop) --- */
+/* --- Biome: caretakers only (no manual feed) --- */
 body[data-mode="biome"] #biomePanel .biome-feed-list { display:none !important; }
-body[data-mode="biome"] #caretakerBtn { display:none !important; }
+
+/* Random caretaker button — glows when active */
+#randomCaretakerBtn { font-size: 0.82em; padding: 5px 10px; }
+#randomCaretakerBtn.active {
+  background: rgba(255, 200, 60, 0.18) !important;
+  border-color: rgba(255, 200, 60, 0.60) !important;
+  color: rgba(255, 220, 130, 1.0) !important;
+  animation: randomPulse 2s ease-in-out infinite;
+}
+@keyframes randomPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,200,60,0); }
+  50%       { box-shadow: 0 0 8px 2px rgba(255,200,60,0.35); }
+}
 body[data-mode="biome"] { background: #101012; }
 
 /* --- Phase UI disabled (v1) --- */
-.phaseControl,
-.phaseCycleControl,
-.touchPhaseControl{
-  display:none !important;
+/* Phase controls are hidden by default (Coyote BT pulses sequentially, phase has no effect).
+   They become visible in control mode when at least one DAC slot is connected,
+   because continuous-wave audio output DOES respond to phase. */
+[phaseControl],
+[phaseCycleControl],
+.touchPhaseControl {
+  display: none !important;
+}
+
+/* Un-hide phase controls when a DAC slot is active (control mode only) */
+body.dac-slot-active [phaseControl],
+body.dac-slot-active [phaseCycleControl] {
+  display: block !important;
 }
 
 /* --- Routing UI for missing devices --- */
@@ -681,3 +702,202 @@ body[data-mode="biome"] { background: #101012; }
   color: rgba(255,220,220,0.95) !important;
 }
 #scriptToggleBtn.running::after { display: none !important; }
+
+/* ============================================================
+   CONNECT PICKER DIALOG
+   ============================================================ */
+
+#connectDialog {
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 22px 20px 18px;
+  min-width: 340px;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+}
+#connectDialog::backdrop { background: rgba(0,0,0,0.65); }
+
+.connect-hint { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+
+.connect-device-list { display: flex; flex-direction: column; gap: 8px; }
+
+.connect-device-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.connect-device-btn:hover { background: #272727; border-color: rgba(255,255,255,0.28); }
+
+/* BT option: blue tint on hover */
+.connect-device-btn:first-child:hover { border-color: rgba(0,170,255,0.45); }
+.connect-device-btn:first-child:hover .connect-dev-icon { color: rgba(0,170,255,0.9); }
+
+/* DAC options: green tint on hover */
+.connect-device-btn:not(:first-child):hover { border-color: rgba(0,220,120,0.4); }
+.connect-device-btn:not(:first-child):hover .connect-dev-icon { color: rgba(0,220,120,0.9); }
+
+.connect-dev-icon {
+  font-size: 20px;
+  line-height: 1;
+  min-width: 26px;
+  text-align: center;
+  color: rgba(255,255,255,0.45);
+}
+.connect-dev-info { display: flex; flex-direction: column; gap: 3px; }
+.connect-dev-name { font-size: 14px; font-weight: 700; }
+.connect-dev-sub { font-size: 11px; color: var(--muted); }
+
+.connect-no-devices { font-size: 12px; color: var(--muted); text-align: center; padding: 12px 0; margin: 0; }
+
+/* DAC-connected badge */
+.devBadge.dac-badge {
+  background: rgba(0,200,100,0.15) !important;
+  border-color: rgba(0,220,120,0.45) !important;
+  color: rgba(160,255,200,0.95) !important;
+}
+
+/* ============================================================
+   DAC AUDIO OUTPUT PANEL
+   ============================================================ */
+
+#dacPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* When DAC is off, mute the panel slightly */
+#dacPanel.dac-panel-off {
+  opacity: 0.75;
+}
+
+.dac-device-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dac-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dac-label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dac-select {
+  flex: 1;
+  min-width: 0;
+  background: #222;
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.dac-select:focus { outline: none; border-color: rgba(255,255,255,0.3); }
+
+.dac-routing {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.dac-route-head {
+  display: grid;
+  grid-template-columns: 3fr 2fr 2fr  3fr 2fr 2fr;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  padding: 0 2px;
+  text-align: center;
+}
+
+.dac-route-row {
+  display: grid;
+  grid-template-columns: 3fr 2fr 2fr  3fr 2fr 2fr;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+
+.dac-ch-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.dac-chk {
+  width: 16px;
+  height: 16px;
+  accent-color: rgba(0,170,255,0.9);
+  cursor: pointer;
+  justify-self: center;
+}
+
+.dac-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.30);
+  text-align: center;
+  margin-top: 2px;
+}
+
+.dac-eq-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.dac-eq-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.dac-eq-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+}
+
+/* Per-slot DAC settings sub-sections */
+.dac-slot-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dac-slot-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 4px;
+}
+
+/* Remove top border on first visible slot */
+.dac-slot-settings:first-of-type .dac-slot-title {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}

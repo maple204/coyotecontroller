@@ -1,15 +1,18 @@
 /**
- * Biome Engine v8.0 - Master Cumulative Ecology
- * --------------------------------------------
+ * Biome Engine v10.0 - Deep-Sea Menagerie
+ * ----------------------------------------
  * Features:
- * - 6 Unique Biological Structures (Worms, Pulsers, Centipedes, Breathers, Hairy Blobs, Abyssal Pulsars)
- * - 6-Way Predation Loop & Chemotaxis (Food seeking)
+ * - 10 Unique Biological Structures (Jellyfish, Radiolarians, Siphonophores, Polychaetes,
+ *   Nudibranchs, Glass Squids, Ctenophores, Mantis Shrimp, Pyrosomes, Sea Angels)
+ * - 10-Way Predation Loop & Chemotaxis (Food seeking)
+ * - 10 Gate Patterns: wave, heartbeat, stroke, thrust, swell, buzz, ripple, gallop, tease, flutter
+ * - ADSR Drift: each creature slowly evolves its own envelope timing for individual variation
  * - Weighted Caretaker Diets (Signature feeding with background variety)
  * - Metabolic Scaling (Hunger affects swimming speed)
  * - Lifecycle: Baby Growth -> Adult Maturity -> Death Dissolution
  * - Visible Diet: Nutrients swirl inside the translucent bodies
  * - Gaussian Bokeh Rendering: Procedural Z-Blur focal plane
- * - Rotifer AI: Parasites hunt and latch to drive audio channels (Fixed Drift Bug)
+ * - Rotifer AI: Parasites hunt and latch to drive audio channels
  */
 
 (() => {
@@ -57,13 +60,18 @@
     carbon: { id: "carbon", tint: [220, 220, 220], type: "metaball" },
   };
 
+  // 10-way predation cycle
   const PREY_MAP = {
-    bacteria: "archaea",      // Breathers eat Pulsers
-    archaea: "flagellate",    // Pulsers eat Ticklers
-    flagellate: "lattice",    // Ticklers eat Compressors
-    lattice: "mycelium",      // Compressors eat Hairy Blobs
-    mycelium: "scintillator", // Hairy Blobs eat Abyssal Pulsars
-    scintillator: "bacteria"  // Abyssal Pulsars eat Breathers
+    bacteria:     "archaea",      // Jellyfish eat Radiolarians
+    archaea:      "flagellate",   // Radiolarians eat Siphonophores
+    flagellate:   "lattice",      // Siphonophores eat Polychaetes
+    lattice:      "mycelium",     // Polychaetes eat Nudibranchs
+    mycelium:     "scintillator", // Nudibranchs eat Glass Squids
+    scintillator: "ctenophore",   // Glass Squids eat Ctenophores
+    ctenophore:   "mantis",       // Ctenophores eat Mantis Shrimp
+    mantis:       "pyrosome",     // Mantis Shrimp eat Pyrosomes
+    pyrosome:     "seaangel",     // Pyrosomes eat Sea Angels
+    seaangel:     "bacteria"      // Sea Angels eat Jellyfish
   };
 
   const CARETAKER_DIETS = {
@@ -75,130 +83,543 @@
     drifter:  { water: 15, carbon: 5, salt: 3   }
   };
 
-const SPECIES = {
+  const SPECIES = {
+
+    // ── JELLYFISH ──────────────────────────────────────────────────────────────
+    // Pulsing bell + trailing tentacles. Animation syncs with "wave" gate.
     bacteria: {
-      name: "Breathers", speed: 0.00006, turn: 0.015, wander: 0.02, drag: 0.96,
-      coreRadius: 0.015, prefs: ["sugar", "water"], reproduction: "mitosis",
+      name: "Jellyfish", speed: 0.00005, turn: 0.012, wander: 0.015, drag: 0.97,
+      coreRadius: 0.019, prefs: ["sugar", "water"], reproduction: "mitosis",
       makeNodes(a, t) {
-        // RESTORED HAIRY BLOB: Core nucleus + reactive fluid-drifting cilia
-        const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.2 }];
-        if (a.state === "alive") {
-          const localT = t * a.timeScale;
-          for (let i = 0; i < 12; i++) {
-            const ang = (i / 12) * TAU + Math.sin(localT * 5 + i);
-            const reach = 0.8 + Math.cos(ang - a.heading) * 0.6;
-            const ext = 0.9 + 0.1 * Math.sin(localT * 8 + i);
-            const [dx, dy] = rotate2(a.r * reach * ext, 0, ang);
-            ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.2, rgb: a.currRgb, a: a.currAlpha * 0.3, s: 0.6 });
-          }
-        }
-        return ns;
-      }
-    },
-    archaea: {
-      name: "Pulsers", speed: 0.0001, turn: 0.03, wander: 0.015, drag: 0.94,
-      coreRadius: 0.013, prefs: ["iron", "salt"], reproduction: "spores",
-      makeNodes(a, t) {
-        // RESTORED SPIKY STAR: Dense core + jittering defense rays
-        const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.1 }];
-        if (a.state === "alive") {
-          const localT = t * a.timeScale;
-          for (let i = 0; i < 6; i++) {
-            const ang = (i / 6) * TAU + Math.sin(localT * 15) * 0.05;
-            const [dx, dy] = rotate2(a.r * 1.5, 0, ang);
-            ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.2, rgb: [255, 255, 255], a: a.currAlpha * 0.4, s: 0.4 });
-          }
-        }
-        return ns;
-      }
-    },
-    flagellate: {
-      name: "Comb Jellies", speed: 0.00015, turn: 0.04, wander: 0.05, drag: 0.9,
-      coreRadius: 0.012, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
-      makeNodes(a, t) {
-        // RIBBON FILAMENTS: Two long undulating thin lines
         const ns = [];
-        const hv = Math.hypot(a.vx, a.vy) + 1e-9;
-        const hx = a.vx / hv, hy = a.vy / hv;
-        const ang = Math.atan2(hy, hx);
-        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * 0.8, rgb: [255,255,255], a: a.currAlpha, s: 0.2 });
-        for (let side = -1; side <= 1; side += 2) {
-          if (side === 0) continue;
-          for (let j = 0; j < 10; j++) {
-            const wave = Math.sin(t * a.timeScale * 10 - j * 0.6 + a.seed) * a.r * 0.8;
-            const [fx, fy] = rotate2(-j * a.r * 0.8, side * a.r * 0.4 + wave, ang);
-            ns.push({ x: a.x + fx, y: a.y + fy, z: a.z, r: a.r * 0.1, rgb: [100 + (j/9) * 155, 200, 255], a: a.currAlpha * (1 - j/9), s: 0.2 });
-          }
+        const lt = t * a.timeScale;
+        // Bell pulse mirrors wave gate (~0.10 Hz)
+        const bellPulse = 0.75 + 0.25 * Math.sin(lt * TAU * 0.10 + a.seed);
+        const bellR = a.r * bellPulse;
+
+        // Outer translucent glow
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bellR * 1.5, rgb: a.currRgb, a: a.currAlpha * 0.12, s: 0.92 });
+        // Bell rim (8 nodes)
+        for (let i = 0; i < 8; i++) {
+          const ang = (i / 8) * TAU;
+          const [dx, dy] = rotate2(bellR, 0, ang);
+          ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.22, rgb: a.currRgb, a: a.currAlpha * 0.55, s: 0.45 });
         }
-        return ns;
-      }
-    },
-    lattice: {
-      name: "Centipedes", speed: 0.00005, turn: 0.01, wander: 0.005, drag: 0.97,
-      coreRadius: 0.012, prefs: ["carbon", "salt"], reproduction: "mitosis",
-      makeNodes(a, t) {
-        // RESTORED CENTIPEDE TUBE: Segmented body with metachronal wave-driven fins
-        const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.2 }];
+        // Inner nucleus
+        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * 0.45, rgb: [255, 255, 255], a: a.currAlpha * 0.85, s: 0.14 });
+
         if (a.state === "alive") {
-          const localT = t * a.timeScale;
+          // 5 trailing tentacles with sinusoidal undulation
           for (let i = 0; i < 5; i++) {
-            const cx = a.x - Math.cos(a.heading) * i * a.r * 1.4;
-            const cy = a.y - Math.sin(a.heading) * i * a.r * 1.4;
-            for (let side = -1; side <= 1; side += 2) {
-              const wave = Math.sin(localT * 8 - i * 1.2) * 0.5;
-              const [fx, fy] = rotate2(a.r * 1.2, side * a.r * (0.8 + wave), a.heading);
-              ns.push({ x: cx + fx, y: cy + fy, z: a.z, r: a.r * 0.2, rgb: [255, 255, 255], a: a.currAlpha * 0.3, s: 0.5 });
+            const spreadAng = ((i - 2) / 2) * 0.55;
+            const tentAng = a.heading + Math.PI + spreadAng;
+            const tentLen = a.r * (3.8 + 1.4 * Math.sin(lt * 0.7 + i * 1.9 + a.seed));
+            for (let j = 1; j <= 9; j++) {
+              const u = j / 9;
+              const wave = Math.sin(lt * 2.8 - j * 0.85 + i * 1.4 + a.seed) * a.r * (0.28 + u * 0.18);
+              const [dx, dy] = rotate2(tentLen * u, wave, tentAng);
+              ns.push({ x: a.x + dx, y: a.y + dy, z: a.z,
+                        r: a.r * (0.13 - u * 0.09), rgb: a.currRgb,
+                        a: a.currAlpha * (1 - u * 0.68), s: 0.32 });
+            }
+          }
+          // 3 shorter frilly oral arms
+          for (let i = 0; i < 3; i++) {
+            const armAng = a.heading + Math.PI + ((i - 1) / 1) * 0.25;
+            for (let j = 1; j <= 5; j++) {
+              const u = j / 5;
+              const ruffle = Math.sin(lt * 5 - j * 1.1 + i * 2.3 + a.seed) * a.r * 0.4;
+              const [dx, dy] = rotate2(a.r * 2.0 * u, ruffle, armAng);
+              ns.push({ x: a.x + dx, y: a.y + dy, z: a.z,
+                        r: a.r * 0.16 * (1 - u * 0.5), rgb: [200, 240, 255],
+                        a: a.currAlpha * (1 - u * 0.6), s: 0.35 });
             }
           }
         }
         return ns;
       }
     },
-mycelium: {
-      name: "Purple Worms", speed: 0.00015, turn: 0.04, wander: 0.05, drag: 0.9,
-      coreRadius: 0.012, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
-      makeNodes(a, t) {
-        // RESTORED PURPLE WORM: 9-segment sinusoidal undulating chain
-        const ns = []; 
-        const segs = 9;
-        const hv = Math.hypot(a.vx, a.vy) + 1e-9;
-        const hx = a.state === "alive" ? a.vx / hv : Math.cos(a.heading);
-        const hy = a.state === "alive" ? a.vy / hv : Math.sin(a.heading);
-        
-        // Individualized wiggle speed
-        const wiggleSpeed = 12 * a.timeScale;
 
-        for (let i = 0; i < segs; i++) {
-          const u = i / (segs - 1);
-          // Wave logic: wiggle propagates down the body
-          const wig = (a.state === "alive" ? Math.sin(t * wiggleSpeed + a.seed - i * 0.8) : 0) * (0.3 * a.r);
-          
-          ns.push({ 
-            x: a.x - hx * i * a.r * 0.8 + (-hy) * wig, 
-            y: a.y - hy * i * a.r * 0.8 + hx * wig, 
-            z: a.z, 
-            r: a.r * (1.1 - u * 0.6), 
-            a: a.currAlpha, 
-            rgb: [205, 140, 235], // Classic Purple
-            s: 0.2 
-          });
+    // ── RADIOLARIAN ────────────────────────────────────────────────────────────
+    // Geometric spined star. Spines pulse outward on heartbeat rhythm.
+    archaea: {
+      name: "Radiolarians", speed: 0.00009, turn: 0.025, wander: 0.012, drag: 0.95,
+      coreRadius: 0.015, prefs: ["iron", "salt"], reproduction: "spores",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        // Heartbeat phase (~63 BPM, mirrors heartbeat gate)
+        const ph = ((lt / 0.95) + a.seed * 0.11) % 1.0;
+        const beat = ph < 0.07 ? 1 + ph * 9
+                   : ph < 0.15 ? 1.63 - (ph - 0.07) * 12
+                   : ph < 0.22 ? 0.67 + (ph - 0.15) * 5
+                   : ph < 0.28 ? 1.02 - (ph - 0.22) * 14
+                   : 0.18;
+        const pulse = clamp(beat, 0.18, 1.8);
+
+        // Core silica shell
+        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * 0.52, rgb: [255, 255, 255], a: a.currAlpha, s: 0.07 });
+        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * pulse * 0.85, rgb: a.currRgb, a: a.currAlpha * 0.32, s: 0.65 });
+
+        if (a.state === "alive") {
+          // 16 radial spines that pulse with the heartbeat
+          for (let i = 0; i < 16; i++) {
+            const ang = (i / 16) * TAU + a.seed * 0.08;
+            const len = a.r * pulse * (1.7 + 0.28 * Math.sin(lt * 0.6 + i * 0.45));
+            const [dx, dy] = rotate2(len, 0, ang);
+            ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.08, rgb: [255, 215, 155], a: a.currAlpha * 0.75, s: 0.07 });
+            // Spine midpoint bead
+            const [mx, my] = rotate2(len * 0.52, 0, ang);
+            ns.push({ x: a.x + mx, y: a.y + my, z: a.z, r: a.r * 0.055, rgb: a.currRgb, a: a.currAlpha * 0.45, s: 0.07 });
+          }
+          // 8 secondary short spines between main ones
+          for (let i = 0; i < 8; i++) {
+            const ang = (i / 8) * TAU + (1 / 16) * TAU + a.seed * 0.08;
+            const len = a.r * pulse * 0.9;
+            const [dx, dy] = rotate2(len, 0, ang);
+            ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.05, rgb: [230, 200, 120], a: a.currAlpha * 0.5, s: 0.07 });
+          }
         }
         return ns;
       }
     },
-    scintillator: {
-      name: "Abyssal Pulsars", speed: 0.00025, turn: 0.12, wander: 0.1, drag: 0.9,
-      coreRadius: 0.012, prefs: ["iron", "water"], reproduction: "mitosis",
+
+    // ── SIPHONOPHORE ──────────────────────────────────────────────────────────
+    // Chain of iridescent zooids with beating comb rows. Smooth stroking feel.
+    flagellate: {
+      name: "Siphonophores", speed: 0.00013, turn: 0.035, wander: 0.04, drag: 0.91,
+      coreRadius: 0.014, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
       makeNodes(a, t) {
-        // GHOST COMET: Sharp head + undulated fiber-optic tail
-        const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r * 1.2, rgb: [255, 255, 255], a: a.currAlpha, s: 0.05 }];
-        const speed = Math.hypot(a.vx, a.vy) * 1200;
-        for (let i = 0; i < 6; i++) {
-          const ang = a.heading + Math.PI + Math.sin(t * a.timeScale * 10 + i) * 0.2;
-          for (let j = 1; j <= 5; j++) {
-            const [dx, dy] = rotate2(a.r * (1.2 + speed) * j, 0, ang);
-            ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.1, rgb: [160, 220, 255], a: a.currAlpha * (0.8 - j/6), s: 0.1 });
+        const ns = [];
+        const lt = t * a.timeScale;
+        const hv = Math.hypot(a.vx, a.vy) + 1e-9;
+        const ang = Math.atan2(a.vy / hv, a.vx / hv);
+
+        // Chain of 14 zooids (gas floats + swimming bells)
+        for (let i = 0; i < 14; i++) {
+          const u = i / 13;
+          const wave = Math.sin(lt * 2.2 - i * 0.5 + a.seed) * a.r * 0.72;
+          const [sx, sy] = rotate2(-i * a.r * 0.65, wave, ang);
+          const zooidR = a.r * (0.55 + 0.28 * Math.sin(lt * 3.5 - i * 0.8 + a.seed)) * (1 - u * 0.42);
+
+          // Iridescent hue shifting along chain
+          const hue = (i / 14) * 180 + lt * 8;
+          const ri = Math.round(100 + 100 * Math.sin(hue * Math.PI / 180));
+          const gi = Math.round(190 + 65 * Math.sin((hue + 100) * Math.PI / 180));
+          const bi = Math.round(230 + 25 * Math.sin((hue + 220) * Math.PI / 180));
+          ns.push({ x: a.x + sx, y: a.y + sy, z: a.z, r: zooidR,
+                    rgb: [ri, gi, bi], a: a.currAlpha * (1 - u * 0.38), s: 0.30 });
+
+          // Comb rows (iridescent beating cilia on each side, every other zooid)
+          if (a.state === "alive" && i % 2 === 0) {
+            for (let side = -1; side <= 1; side += 2) {
+              const combPhase = Math.sin(lt * 9 + i * 0.9 + a.seed) * 0.35;
+              const combAng = ang + side * (Math.PI * 0.5 + combPhase);
+              for (let c = 0; c < 3; c++) {
+                const [cx, cy] = rotate2(zooidR * (0.8 + c * 0.35), 0, combAng);
+                ns.push({ x: a.x + sx + cx, y: a.y + sy + cy, z: a.z,
+                          r: a.r * (0.08 - c * 0.02), rgb: [210, 255, 230],
+                          a: a.currAlpha * (0.65 - c * 0.18), s: 0.07 });
+              }
+            }
           }
+        }
+        return ns;
+      }
+    },
+
+    // ── POLYCHAETE ────────────────────────────────────────────────────────────
+    // Armoured bristle worm. Deep rhythmic thrust. Dense parapodial bristle fans.
+    lattice: {
+      name: "Polychaetes", speed: 0.00006, turn: 0.012, wander: 0.006, drag: 0.97,
+      coreRadius: 0.014, prefs: ["carbon", "salt"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        // Thrust phase for visual sync (~0.35 Hz, mirrors thrust gate)
+        const thrustPh = (lt * 0.35 + a.seed * 0.4) % 1.0;
+        const thrustPow = thrustPh < 0.68
+          ? Math.pow(thrustPh / 0.68, 2)
+          : Math.pow(1 - (thrustPh - 0.68) / 0.32, 0.45);
+
+        const nSegs = 9;
+        for (let i = 0; i < nSegs; i++) {
+          const u = i / (nSegs - 1);
+          const wig = Math.sin(lt * 4.5 - i * 1.0 + a.seed) * a.r * (0.28 + thrustPow * 0.55);
+          const cx = a.x - Math.cos(a.heading) * i * a.r * 1.05;
+          const cy = a.y - Math.sin(a.heading) * i * a.r * 1.05;
+          const [wx, wy] = rotate2(0, wig, a.heading);
+          // Segment body — hardened ring
+          ns.push({ x: cx + wx, y: cy + wy, z: a.z,
+                    r: a.r * (0.88 - u * 0.28), rgb: a.currRgb, a: a.currAlpha, s: 0.13 });
+
+          if (a.state === "alive") {
+            // Parapodia with bristle fans (5 bristles per side)
+            for (let side = -1; side <= 1; side += 2) {
+              const parapodWave = Math.sin(lt * 4.5 - i * 1.0 + a.seed) * 0.38;
+              for (let b = 0; b < 5; b++) {
+                const bristleAng = a.heading + side * (Math.PI * 0.52 + (b - 2) * 0.19) + side * parapodWave;
+                const bLen = a.r * (0.95 + 0.28 * Math.sin(lt * 5.5 - i - b + a.seed));
+                const [bdx, bdy] = rotate2(bLen, 0, bristleAng);
+                ns.push({ x: cx + wx + bdx, y: cy + wy + bdy, z: a.z,
+                          r: a.r * 0.062, rgb: [255, 195, 75],
+                          a: a.currAlpha * 0.60, s: 0.07 });
+              }
+            }
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── NUDIBRANCH ────────────────────────────────────────────────────────────
+    // Smooth segmented body with colourful cerata plumes along the back.
+    mycelium: {
+      name: "Nudibranchs", speed: 0.00013, turn: 0.035, wander: 0.045, drag: 0.91,
+      coreRadius: 0.014, prefs: ["sulfur", "sugar"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        const hv = Math.hypot(a.vx, a.vy) + 1e-9;
+        const hx = a.state === "alive" ? a.vx / hv : Math.cos(a.heading);
+        const hy = a.state === "alive" ? a.vy / hv : Math.sin(a.heading);
+        const bodyAng = Math.atan2(hy, hx);
+        const segs = 11;
+
+        for (let i = 0; i < segs; i++) {
+          const u = i / (segs - 1);
+          const wig = Math.sin(lt * 7 + a.seed - i * 0.75) * (0.22 * a.r);
+          const bx = a.x - hx * i * a.r * 0.72 + (-hy) * wig;
+          const by = a.y - hy * i * a.r * 0.72 + hx * wig;
+          const segR = a.r * (0.92 - u * 0.38);
+          // Body (deep purple-magenta)
+          ns.push({ x: bx, y: by, z: a.z, r: segR, rgb: [195, 95, 235], a: a.currAlpha, s: 0.17 });
+
+          if (a.state === "alive" && i > 0 && i < segs - 1) {
+            // Two rows of cerata (dorsal plumes), alternating orange and magenta tips
+            for (let side = -1; side <= 1; side += 2) {
+              const cerataBaseAng = bodyAng + side * Math.PI * 0.42;
+              const sway = Math.sin(lt * 2.8 + i * 0.62 + side * 1.1 + a.seed) * 0.55;
+              const cerataLen = a.r * (1.25 - u * 0.55) * (0.85 + sway * 0.25);
+              for (let j = 1; j <= 4; j++) {
+                const ju = j / 4;
+                const branchAng = cerataBaseAng + sway * ju * 0.38;
+                const [cdx, cdy] = rotate2(cerataLen * ju, 0, branchAng);
+                const cerataRgb = side > 0 ? [255, 105, 45] : [255, 55, 210];
+                ns.push({ x: bx + cdx, y: by + cdy, z: a.z,
+                          r: a.r * (0.19 - ju * 0.12), rgb: cerataRgb,
+                          a: a.currAlpha * (1 - ju * 0.42), s: 0.17 });
+              }
+            }
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── GLASS SQUID ───────────────────────────────────────────────────────────
+    // Transparent mantle + lateral fins + 8 arms with bioluminescent flash.
+    scintillator: {
+      name: "Glass Squids", speed: 0.00022, turn: 0.10, wander: 0.09, drag: 0.92,
+      coreRadius: 0.014, prefs: ["iron", "water"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        const spd = Math.hypot(a.vx, a.vy);
+        const speedN = clamp(spd / 0.00022, 0, 1);
+
+        // Bioluminescent flash (mirrors buzz gate ~12 Hz)
+        const flashPh = (lt * 12 + a.seed * 2.7) % 1.0;
+        const flash = flashPh < 0.07;
+        const flashBright = flash ? 1.55 : 0;
+
+        // Mantle (elongated teardrop)
+        const mantleLen = a.r * (1.7 + speedN * 0.55);
+        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * 0.82,
+                  rgb: flash ? [255, 255, 255] : [155, 220, 255], a: a.currAlpha, s: 0.09 });
+        for (let j = 1; j <= 4; j++) {
+          const [bx, by] = rotate2(-mantleLen * (j / 4), 0, a.heading);
+          ns.push({ x: a.x + bx, y: a.y + by, z: a.z,
+                    r: a.r * (0.72 - j * 0.14), rgb: [145, 205, 255],
+                    a: a.currAlpha * 0.65, s: 0.11 });
+        }
+
+        // Lateral fins (triangular, near tail)
+        if (a.state === "alive") {
+          for (let side = -1; side <= 1; side += 2) {
+            for (let j = 0; j < 5; j++) {
+              const [fdx, fdy] = rotate2(-a.r * (0.55 + j * 0.38), side * a.r * (0.52 + j * 0.13), a.heading);
+              ns.push({ x: a.x + fdx, y: a.y + fdy, z: a.z,
+                        r: a.r * (0.17 - j * 0.025), rgb: [120, 200, 255],
+                        a: a.currAlpha * 0.42, s: 0.22 });
+            }
+          }
+
+          // 8 trailing arms with sinusoidal motion and flash tips
+          for (let i = 0; i < 8; i++) {
+            const spread = ((i - 3.5) / 3.5) * 0.68;
+            const armAng = a.heading + Math.PI + spread;
+            for (let j = 1; j <= 7; j++) {
+              const u = j / 7;
+              const armWave = Math.sin(lt * 6.5 + j * 0.9 + i * 0.85 + a.seed) * a.r * 0.23;
+              const [adx, ady] = rotate2(a.r * j * 0.44, armWave, armAng);
+              const armRgb = (u > 0.72 && flash) ? [255, 255, 200] : [95 + i * 14, 178, 255];
+              ns.push({ x: a.x + adx, y: a.y + ady, z: a.z,
+                        r: a.r * (0.10 - u * 0.055), rgb: armRgb,
+                        a: a.currAlpha * (1 - u * 0.48) * (u > 0.72 ? 1 + flashBright : 1), s: 0.20 });
+            }
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── CTENOPHORE ────────────────────────────────────────────────────────────
+    // Oval transparent body with 8 iridescent comb-plate rows + 2 branching tentacles.
+    // Comb rows beat in succession creating a rainbow rippling shimmer.
+    ctenophore: {
+      name: "Ctenophores", speed: 0.00007, turn: 0.018, wander: 0.020, drag: 0.96,
+      coreRadius: 0.017, prefs: ["water", "sugar"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        const bodyA = a.r * 1.3;  // semi-major axis (length)
+        const bodyB = a.r * 0.72; // semi-minor axis (width)
+
+        // Outer translucent glow
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bodyA * 1.15, rgb: a.currRgb, a: a.currAlpha * 0.10, s: 0.90 });
+        // Inner bright core
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bodyA * 0.48, rgb: [255, 255, 255], a: a.currAlpha * 0.38, s: 0.07 });
+
+        if (a.state === "alive") {
+          // 8 comb-plate rows running along body length, iridescent beating
+          for (let i = 0; i < 8; i++) {
+            const rowAng = a.heading + (i / 8) * TAU + a.seed * 0.05;
+            for (let j = 0; j < 7; j++) {
+              const u = (j / 6) - 0.5; // -0.5 to +0.5 along body
+              const bx = a.x + Math.cos(a.heading) * u * bodyA * 1.8;
+              const by = a.y + Math.sin(a.heading) * u * bodyA * 1.8;
+              // Beat ripples down each row at different phase (metachronal rhythm)
+              const combPhase = lt * 3.5 - j * 0.65 + i * (TAU / 8) + a.seed;
+              const bulge = 0.25 + 0.25 * Math.sin(combPhase);
+              const [cdx, cdy] = rotate2(bodyB * bulge, 0, rowAng + Math.PI * 0.5);
+              // Rainbow iridescence traveling along comb rows
+              const hue = ((i / 8) * 300 + lt * 22 + j * 18) % 360;
+              const ri = Math.round(155 + 100 * Math.sin(hue * Math.PI / 180));
+              const gi = Math.round(205 + 50 * Math.sin((hue + 120) * Math.PI / 180));
+              const bi = Math.round(215 + 40 * Math.sin((hue + 240) * Math.PI / 180));
+              ns.push({ x: bx + cdx, y: by + cdy, z: a.z,
+                        r: a.r * (0.085 - Math.abs(u) * 0.038), rgb: [ri, gi, bi],
+                        a: a.currAlpha * (0.68 - Math.abs(u) * 0.24), s: 0.11 });
+            }
+          }
+          // 2 long trailing tentacles with branches at midpoint
+          for (let arm = 0; arm < 2; arm++) {
+            const tentAng = a.heading + Math.PI + (arm === 0 ? 0.10 : -0.10);
+            const tentLen = a.r * (4.5 + 1.5 * Math.sin(lt * 0.4 + arm * 2.1 + a.seed));
+            for (let j = 1; j <= 10; j++) {
+              const u = j / 10;
+              const wave = Math.sin(lt * 1.8 - j * 0.7 + arm * 3.1 + a.seed) * a.r * (0.30 + u * 0.5);
+              const [dx, dy] = rotate2(tentLen * u, wave, tentAng);
+              ns.push({ x: a.x + dx, y: a.y + dy, z: a.z,
+                        r: a.r * (0.085 - u * 0.062), rgb: [180, 255, 242],
+                        a: a.currAlpha * (1 - u * 0.70), s: 0.28 });
+              // Branch at tentacle midpoint
+              if (j === 5) {
+                const branchAng = tentAng + (arm === 0 ? 0.65 : -0.65);
+                for (let k = 1; k <= 4; k++) {
+                  const bu = k / 4;
+                  const bwave = Math.sin(lt * 2.5 + k * 0.9 + a.seed) * a.r * 0.22;
+                  const [bdx, bdy] = rotate2(a.r * 1.4 * bu, bwave, branchAng);
+                  ns.push({ x: a.x + dx + bdx, y: a.y + dy + bdy, z: a.z,
+                            r: a.r * 0.052 * (1 - bu * 0.5), rgb: [155, 240, 225],
+                            a: a.currAlpha * (0.50 - bu * 0.32), s: 0.32 });
+                }
+              }
+            }
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── MANTIS SHRIMP ─────────────────────────────────────────────────────────
+    // Armoured, rainbow-striped body + raptorial punching claws + fan tail.
+    // Claws extend on the STRONG beat of the gallop gate.
+    mantis: {
+      name: "Mantis Shrimp", speed: 0.00015, turn: 0.08, wander: 0.06, drag: 0.88,
+      coreRadius: 0.016, prefs: ["iron", "carbon"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        // Gallop phase visual sync (matches gallop gate: quick-quick-STRONG)
+        const gallRate = 1.5;
+        const ph = ((lt * gallRate) + a.seed * 0.3) % 1.0;
+        const clawPunch = ph < 0.36 ? 0
+          : ph < 0.65 ? Math.pow((ph - 0.36) / 0.29, 1.6)
+          : ph < 0.80 ? Math.pow(1 - (ph - 0.65) / 0.15, 0.55)
+          : 0;
+
+        // 7 armoured body segments, iridescent rainbow stripes
+        for (let i = 0; i < 7; i++) {
+          const u = i / 6;
+          const segX = a.x - Math.cos(a.heading) * i * a.r * 0.68;
+          const segY = a.y - Math.sin(a.heading) * i * a.r * 0.68;
+          const wig = Math.sin(lt * 6 - i * 0.9 + a.seed) * a.r * 0.12;
+          const [wx, wy] = rotate2(0, wig, a.heading);
+          const hue = (i / 7) * 280 + lt * 5;
+          const ri = Math.round(175 + 80 * Math.sin(hue * Math.PI / 180));
+          const gi = Math.round(185 + 70 * Math.sin((hue + 110) * Math.PI / 180));
+          const bi = Math.round(200 + 55 * Math.sin((hue + 230) * Math.PI / 180));
+          ns.push({ x: segX + wx, y: segY + wy, z: a.z,
+                    r: a.r * (0.85 - u * 0.35), rgb: [ri, gi, bi], a: a.currAlpha, s: 0.10 });
+
+          if (a.state === "alive" && i > 1 && i < 6) {
+            // Pleopods (swimming legs) per side
+            for (let side = -1; side <= 1; side += 2) {
+              const legAng = a.heading + side * (Math.PI * 0.5 + Math.sin(lt * 6 - i + a.seed) * 0.35);
+              const [ldx, ldy] = rotate2(a.r * 0.8, 0, legAng);
+              ns.push({ x: segX + wx + ldx, y: segY + wy + ldy, z: a.z,
+                        r: a.r * 0.068, rgb: [ri, gi, bi], a: a.currAlpha * 0.52, s: 0.16 });
+            }
+          }
+        }
+
+        if (a.state === "alive") {
+          // Raptorial claws — extend forward on STRONG beat
+          for (let side = -1; side <= 1; side += 2) {
+            const clawAng = a.heading + side * 0.35;
+            const extension = a.r * (1.5 + clawPunch * 1.9);
+            const [cx, cy] = rotate2(extension, side * a.r * 0.28, clawAng);
+            ns.push({ x: a.x + cx, y: a.y + cy, z: a.z,
+                      r: a.r * (0.28 + clawPunch * 0.14),
+                      rgb: [255, Math.round(175 - clawPunch * 80), Math.round(55 + clawPunch * 100)],
+                      a: a.currAlpha * (0.85 + clawPunch * 0.15), s: 0.12 });
+            // Club head (the hammer)
+            const [chx, chy] = rotate2(extension * 1.22, side * a.r * 0.18, clawAng);
+            ns.push({ x: a.x + chx, y: a.y + chy, z: a.z,
+                      r: a.r * (0.22 + clawPunch * 0.18),
+                      rgb: [255, Math.round(120 - clawPunch * 60), 30],
+                      a: a.currAlpha * (0.95 + clawPunch * 0.05), s: 0.09 });
+          }
+          // Fan tail — 5 uropods
+          for (let i = -2; i <= 2; i++) {
+            const tailAng = a.heading + Math.PI + (i / 2) * 0.60;
+            const tailLen = a.r * (2.2 + 0.5 * clawPunch);
+            const [tdx, tdy] = rotate2(tailLen, 0, tailAng);
+            ns.push({ x: a.x + tdx, y: a.y + tdy, z: a.z,
+                      r: a.r * (0.18 - Math.abs(i) * 0.04), rgb: [205, 232, 255],
+                      a: a.currAlpha * (0.62 - Math.abs(i) * 0.08), s: 0.18 });
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── PYROSOME ──────────────────────────────────────────────────────────────
+    // Transparent cylindrical colony (12 zooids) with traveling bioluminescent wave.
+    // The wave slowly creeps from tip to tip, glowing cyan-green.
+    pyrosome: {
+      name: "Pyrosomes", speed: 0.00004, turn: 0.008, wander: 0.008, drag: 0.98,
+      coreRadius: 0.013, prefs: ["water", "carbon"], reproduction: "spores",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        const numZooids = 12;
+        const bodyLen = a.r * 4.5;
+
+        // Outer colony silhouette glow
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bodyLen * 0.80, rgb: a.currRgb, a: a.currAlpha * 0.06, s: 0.92 });
+
+        for (let i = 0; i < numZooids; i++) {
+          const u = i / (numZooids - 1);
+          const bx = a.x + Math.cos(a.heading) * (u - 0.5) * bodyLen;
+          const by = a.y + Math.sin(a.heading) * (u - 0.5) * bodyLen;
+          const gentle = Math.sin(lt * 0.18 + a.seed + i * 0.3) * a.r * 0.07;
+          const [gx, gy] = rotate2(0, gentle, a.heading);
+
+          // Traveling bioluminescent wave (mirrors tease gate slow pace)
+          const wavePh = ((lt * 0.55 - u * 2.8 + a.seed) % 1.0 + 1.0) % 1.0;
+          const glow = Math.max(0, Math.sin(wavePh * Math.PI));
+          const glowRgb = glow > 0.7 ? [185, 255, 145] : glow > 0.3 ? [100, 210, 255] : a.currRgb;
+
+          ns.push({ x: bx + gx, y: by + gy, z: a.z,
+                    r: a.r * (0.36 + 0.12 * glow * glow), rgb: glowRgb,
+                    a: a.currAlpha * (0.42 + 0.55 * glow), s: 0.18 });
+
+          // Bright canal glow at wave peak
+          if (glow > 0.45) {
+            ns.push({ x: bx + gx, y: by + gy, z: a.z,
+                      r: a.r * 0.17, rgb: [215, 255, 195],
+                      a: a.currAlpha * glow * 0.82, s: 0.05 });
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── SEA ANGEL (Clione) ────────────────────────────────────────────────────
+    // Tiny transparent body with visible internal organs + two flapping parapodia.
+    // Wings beat in paired pulses (flutter gate rhythm).
+    seaangel: {
+      name: "Sea Angels", speed: 0.00010, turn: 0.040, wander: 0.030, drag: 0.93,
+      coreRadius: 0.013, prefs: ["sulfur", "salt"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        // Wing beat phase syncs with flutter gate (~4 Hz, paired)
+        const flutRate = 4.0;
+        const flutPh = ((lt * flutRate) + a.seed * 0.5) % 1.0;
+        const pairDuty = 0.22;
+        let wingBeat = 0;
+        if (flutPh < pairDuty * 0.45) {
+          wingBeat = Math.sin((flutPh / (pairDuty * 0.45)) * Math.PI);
+        } else if (flutPh < pairDuty) {
+          wingBeat = Math.sin(((flutPh - pairDuty * 0.45) / (pairDuty * 0.55)) * Math.PI) * 0.70;
+        }
+        const wf = clamp(wingBeat, 0, 1);
+
+        const bodyLen = a.r * 1.6;
+        // Head (slightly luminous)
+        const [hx, hy] = rotate2(bodyLen * 0.3, 0, a.heading);
+        ns.push({ x: a.x + hx, y: a.y + hy, z: a.z,
+                  r: a.r * 0.52, rgb: [255, 242, 255], a: a.currAlpha * 0.75, s: 0.09 });
+        // Body segments (4)
+        for (let i = 0; i < 4; i++) {
+          const u = i / 3;
+          const [bx, by] = rotate2(-u * bodyLen * 0.7, 0, a.heading);
+          ns.push({ x: a.x + bx, y: a.y + by, z: a.z,
+                    r: a.r * (0.42 - u * 0.12), rgb: [232, 212, 255],
+                    a: a.currAlpha * 0.70, s: 0.12 });
+        }
+        // Visible viscera — bright warm internal glow
+        ns.push({ x: a.x, y: a.y, z: a.z, r: a.r * 0.21,
+                  rgb: [255, 118, 82], a: a.currAlpha * 0.88, s: 0.05 });
+
+        if (a.state === "alive") {
+          // Two parapodia wings — 5-node fan, flapping up on each beat
+          for (let side = -1; side <= 1; side += 2) {
+            const wingBaseAng = a.heading + side * (Math.PI * 0.5 + wf * 0.9);
+            const wingLen = a.r * (2.2 + wf * 1.4);
+            for (let j = 0; j < 5; j++) {
+              const fanAng = wingBaseAng + side * (j - 2) * 0.22;
+              const [wdx, wdy] = rotate2(wingLen * (0.70 + j * 0.06), 0, fanAng);
+              ns.push({ x: a.x + wdx, y: a.y + wdy, z: a.z,
+                        r: a.r * (0.13 - j * 0.018), rgb: [200, 178, 255],
+                        a: a.currAlpha * (0.58 + wf * 0.35 - j * 0.08), s: 0.22 });
+            }
+            // Tip glow during beat
+            if (wf > 0.30) {
+              const [wtx, wty] = rotate2(wingLen * 1.1, 0, wingBaseAng);
+              ns.push({ x: a.x + wtx, y: a.y + wty, z: a.z,
+                        r: a.r * 0.17 * wf, rgb: [238, 212, 255],
+                        a: a.currAlpha * wf * 0.88, s: 0.15 });
+            }
+          }
+          // Trailing foot
+          const [tdx, tdy] = rotate2(-bodyLen * 1.1, 0, a.heading);
+          ns.push({ x: a.x + tdx, y: a.y + tdy, z: a.z,
+                    r: a.r * 0.17, rgb: [218, 198, 255], a: a.currAlpha * 0.42, s: 0.32 });
         }
         return ns;
       }
@@ -280,73 +701,230 @@ class NutrientBlob {
 
   
   // ---------------------------------------------------------------------------
-  // FAMILY SOUND LIBRARIES (monophonic; identity via register + gating + texture)
+  // FAMILY SOUND LIBRARIES — each species has a radically different sensation
+  // identity. Gate types: wave, heartbeat, stroke, thrust, swell, buzz.
   // ---------------------------------------------------------------------------
-const SOUND_LIB = {
-    bacteria: { // Diatoms
-      identity: "crystalline click",
-      regMul: 2.5, minMul: 2.0, maxMul: 3.0, // High and narrow
+  const SOUND_LIB = {
+    bacteria: { // Jellyfish — long breathing ocean swells
+      identity: "slow ocean breath",
+      regMul: 0.8, minMul: 0.5, maxMul: 1.4,
+      ratios: [1, 1.25, 1.5],
+      hopHz: [0.08, 0.15, 0.25],      // very slow hops
+      glide: 0.03,
+      vibratoHz: [0.3, 0.7], vibratoAmt: [0.02, 0.04],
+      gate: "wave", talkiness: 0.15, grit: 0.005,
+      echo: { taps: [1.2, 2.4], gains: [0.22, 0.10] }
+    },
+    archaea: { // Radiolarians — heartbeat double-pulse (lub-dub)
+      identity: "heartbeat",
+      regMul: 1.4, minMul: 0.8, maxMul: 2.2,
+      ratios: [1, 1.5, 2],
+      hopHz: [0.5, 1.0, 1.5],
+      glide: 0.08,
+      vibratoHz: [0.8, 2.0], vibratoAmt: [0.015, 0.03],
+      gate: "heartbeat", talkiness: 0.3, grit: 0.02,
+      echo: { taps: [0.12, 0.42], gains: [0.38, 0.18] }
+    },
+    flagellate: { // Siphonophores — smooth silky stroking
+      identity: "silk stroke",
+      regMul: 1.1, minMul: 0.7, maxMul: 1.8,
+      ratios: [1, 1.2, 1.33, 1.5],
+      hopHz: [0.3, 0.8, 1.5],
+      glide: 0.06,
+      vibratoHz: [3, 6], vibratoAmt: [0.02, 0.05],
+      gate: "stroke", talkiness: 0.4, grit: 0.01,
+      echo: { taps: [0.15, 0.30], gains: [0.20, 0.10] }
+    },
+    lattice: { // Polychaetes — deep rhythmic thrusting power
+      identity: "deep thrust",
+      regMul: 0.35, minMul: 0.20, maxMul: 0.55,
       ratios: [1, 1.1, 1.2],
-      hopHz: [2.0, 5.0, 8.0],
-      glide: 0.5, // Snap to notes
-      vibratoHz: [8, 12], vibratoAmt: [0.01, 0.02],
-      gate: "staccato", talkiness: 0.4, grit: 0.1,
-      echo: { taps: [0.05], gains: [0.3] }
+      hopHz: [0.15, 0.3, 0.5],
+      glide: 0.04,
+      vibratoHz: [0.1, 0.4], vibratoAmt: [0.008, 0.015],
+      gate: "thrust", talkiness: 0.08, grit: 0.005,
+      echo: { taps: [0.65, 1.30], gains: [0.40, 0.20] }
     },
-    archaea: { // Radiolars
-      identity: "needle sweep",
-      regMul: 1.2, minMul: 0.5, maxMul: 4.0, // Wide sweep range
-      ratios: [1, 1.5, 2, 0.75],
-      hopHz: [0.2, 0.5, 0.8],
-      glide: 0.02, // Very slow slides
-      vibratoHz: [0.5, 2], vibratoAmt: [0.02, 0.05],
-      gate: "swell", talkiness: 0.2, grit: 0.02,
-      echo: { taps: [0.4, 0.8], gains: [0.2, 0.1] }
-    },
-    flagellate: { // Comb Jellies
-      identity: "rainbow shimmer",
-      regMul: 1.0, minMul: 0.8, maxMul: 1.5,
-      ratios: [1, 1.25, 1.33, 1.5, 1.66],
-      hopHz: [0.5, 1.5, 3.0],
-      glide: 0.15,
-      vibratoHz: [4, 7], vibratoAmt: [0.03, 0.08],
-      gate: "talk", talkiness: 0.6, grit: 0.05,
-      echo: { taps: [0.1, 0.2, 0.3], gains: [0.3, 0.2, 0.1] }
-    },
-    lattice: { // Rib-Cages
-      identity: "deep vertebral thump",
-      regMul: 0.4, minMul: 0.3, maxMul: 0.6, // Very low
-      ratios: [1, 1.1],
-      hopHz: [0.1, 0.3],
-      glide: 0.05,
-      vibratoHz: [0.1, 0.5], vibratoAmt: [0.01, 0.02],
-      gate: "breath", talkiness: 0.1, grit: 0.01,
-      echo: { taps: [0.5], gains: [0.4] }
-    },
-    mycelium: { // Phantom Worms
+    mycelium: { // Nudibranchs — liquid flowing swell
       identity: "liquid eel",
-      regMul: 0.8, minMul: 0.5, maxMul: 2.0,
+      regMul: 0.75, minMul: 0.5, maxMul: 1.6,
       ratios: [1, 1.2, 1.4, 1.6],
-      hopHz: [0.4, 1.0, 2.0],
-      glide: 0.04, // Liquid slides
-      vibratoHz: [2, 5], vibratoAmt: [0.05, 0.1],
-      gate: "swell", talkiness: 0.3, grit: 0.08,
-      echo: { taps: [0.2, 0.4], gains: [0.3, 0.2] }
+      hopHz: [0.3, 0.7, 1.5],
+      glide: 0.05,
+      vibratoHz: [2, 4], vibratoAmt: [0.04, 0.08],
+      gate: "swell", talkiness: 0.25, grit: 0.06,
+      echo: { taps: [0.25, 0.50], gains: [0.28, 0.14] }
     },
-    scintillator: { // Abyssal Pulsars
-      identity: "glitch pulsar",
-      regMul: 1.8, minMul: 1.0, maxMul: 5.0,
-      ratios: [1, 1.5, 2, 2.5, 3, 4],
-      hopHz: [3.0, 6.0, 12.0], // Fast hops
-      glide: 0.8, // Immediate snaps
-      vibratoHz: [10, 20], vibratoAmt: [0.1, 0.2],
-      gate: "staccato", talkiness: 0.9, grit: 0.4,
-      echo: { taps: [0.02, 0.05, 0.08], gains: [0.5, 0.3, 0.1] }
+    scintillator: { // Glass Squids — rapid electric buzz with AM envelope
+      identity: "electric buzz",
+      regMul: 2.2, minMul: 1.2, maxMul: 5.0,
+      ratios: [1, 1.5, 2, 2.5, 3],
+      hopHz: [4.0, 8.0, 16.0],
+      glide: 0.85,
+      vibratoHz: [12, 20], vibratoAmt: [0.08, 0.18],
+      gate: "buzz", talkiness: 0.85, grit: 0.35,
+      echo: { taps: [0.03, 0.07, 0.13], gains: [0.50, 0.28, 0.12] }
+    },
+    ctenophore: { // Ctenophores — expanding concentric ring pulses
+      identity: "ripple tide",
+      regMul: 0.9, minMul: 0.55, maxMul: 1.6,
+      ratios: [1, 1.2, 1.4, 1.6],
+      hopHz: [0.2, 0.5, 0.9],
+      glide: 0.04,
+      vibratoHz: [1.5, 3.5], vibratoAmt: [0.025, 0.05],
+      gate: "ripple", talkiness: 0.20, grit: 0.008,
+      echo: { taps: [0.35, 0.70], gains: [0.28, 0.12] }
+    },
+    mantis: { // Mantis Shrimp — quick-quick-STRONG gallop punch
+      identity: "gallop punch",
+      regMul: 1.6, minMul: 0.9, maxMul: 3.0,
+      ratios: [1, 1.25, 1.5, 2],
+      hopHz: [0.8, 1.5, 2.5],
+      glide: 0.12,
+      vibratoHz: [0.5, 1.5], vibratoAmt: [0.01, 0.025],
+      gate: "gallop", talkiness: 0.35, grit: 0.04,
+      echo: { taps: [0.08, 0.24, 0.48], gains: [0.45, 0.22, 0.10] }
+    },
+    pyrosome: { // Pyrosomes — slow teasing climb that never resolves
+      identity: "tease wave",
+      regMul: 0.65, minMul: 0.4, maxMul: 1.2,
+      ratios: [1, 1.15, 1.3],
+      hopHz: [0.06, 0.12, 0.22],
+      glide: 0.025,
+      vibratoHz: [0.2, 0.6], vibratoAmt: [0.04, 0.09],
+      gate: "tease", talkiness: 0.10, grit: 0.012,
+      echo: { taps: [1.8, 3.6], gains: [0.18, 0.08] }
+    },
+    seaangel: { // Sea Angels — delicate paired wing-beat flutter
+      identity: "angel flutter",
+      regMul: 1.05, minMul: 0.65, maxMul: 1.9,
+      ratios: [1, 1.33, 1.5, 2],
+      hopHz: [1.0, 2.5, 4.5],
+      glide: 0.07,
+      vibratoHz: [3, 6], vibratoAmt: [0.03, 0.065],
+      gate: "flutter", talkiness: 0.30, grit: 0.015,
+      echo: { taps: [0.12, 0.24], gains: [0.32, 0.14] }
     }
   };
 
-  function gateFor(lib, t, speedN, seed) {
+  // gateFor — shapes the amplitude envelope for each species' sensation.
+  // adsr: optional per-creature drift object { rateMul, ampMul, dutyMul }
+  //   rateMul → stretches/compresses cycle tempo (0.6–1.5)
+  //   ampMul  → scales peak amplitude (0.78–1.22)
+  //   dutyMul → stretches on/off ratio for pulse-style gates (0.65–1.45)
+  function gateFor(lib, t, speedN, seed, adsr) {
+    const rd = (adsr && adsr.rateMul) ? adsr.rateMul : 1.0;
+    const ad = (adsr && adsr.ampMul)  ? adsr.ampMul  : 1.0;
+    const dd = (adsr && adsr.dutyMul) ? adsr.dutyMul : 1.0;
+
     switch (lib.gate) {
+
+      // WAVE — long rolling ocean swells; creature feels like breathing in and out
+      case "wave": {
+        const rate = (0.08 + 0.12 * speedN) * rd; // 0.08–0.20 Hz, drifts per creature
+        const a = Math.sin(t * rate * TAU + seed) * 0.5 + 0.5;
+        return Math.pow(a, 0.55) * 1.15 * ad;
+      }
+
+      // HEARTBEAT — lub-dub double-pulse with long diastole rest
+      case "heartbeat": {
+        const bpm = (52 + 28 * speedN) * rd; // BPM drifts per creature
+        const period = 60 / bpm;
+        const ph = ((t / period) + seed * 0.11) % 1.0;
+        if (ph < 0.07)  return 1.60 * ad;
+        if (ph < 0.14)  return (0.10 + (ph - 0.07) * 7) * ad;
+        if (ph < 0.21)  return 1.25 * ad;
+        if (ph < 0.28)  return (1.25 - (ph - 0.21) * 16) * ad;
+        return 0.04;
+      }
+
+      // STROKE — smooth continuous sensation with a gentle 1 Hz ripple
+      case "stroke": {
+        const base = 0.55 + 0.45 * Math.sin(t * 0.85 * rd + seed);
+        const ripple = 1 + 0.22 * Math.sin(t * TAU * (1.0 + speedN * 0.6) * rd + seed * 5.1);
+        return clamp(base * ripple * ad, 0.05, 1.35);
+      }
+
+      // THRUST — slow power build to a peak, then sharp release
+      case "thrust": {
+        const rate = (0.22 + 0.38 * speedN) * rd;
+        const ph = (t * rate + seed * 0.4) % 1.0;
+        if (ph < 0.68) return (0.04 + Math.pow(ph / 0.68, 1.9) * 1.45) * ad;
+        return (1.49 * Math.pow(1 - (ph - 0.68) / 0.32, 0.45)) * ad;
+      }
+
+      // SWELL — smooth double-harmonic rise and fall
+      case "swell": {
+        const a = 0.55 + 0.45 * Math.sin(t * 0.65 * rd + seed);
+        const b = 0.50 + 0.50 * Math.sin(t * 1.25 * rd + seed * 2.1);
+        return Math.pow(a * 0.70 + b * 0.30, 1.2) * ad;
+      }
+
+      // BUZZ — rapid machine-gun stutter with slow AM envelope
+      case "buzz": {
+        const burstRate = (7 + 11 * speedN) * rd;
+        const ph = (t * burstRate + seed * 2.7) % 1.0;
+        const dutyOn = (0.06 + 0.07 * speedN) * dd;
+        const on = ph < dutyOn;
+        const env = 0.60 + 0.40 * Math.sin(t * 0.42 + seed);
+        return on ? (1.0 + env * 0.38) * ad : 0.04;
+      }
+
+      // RIPPLE — expanding concentric-ring pulses, 0.5–1.5 Hz
+      // Like dropping stones in still water; each pulse fades as the next begins.
+      case "ripple": {
+        const rate = (0.5 + 1.0 * speedN) * rd;
+        const ph  = (t * rate + seed * 0.3) % 1.0;
+        const ring  = ph < 0.15 ? ph / 0.15 : Math.exp(-(ph - 0.15) * 4.5);
+        const ph2 = (t * rate + seed * 0.3 + 0.5) % 1.0;
+        const ring2 = (ph2 < 0.15 ? ph2 / 0.15 : Math.exp(-(ph2 - 0.15) * 4.5)) * 0.5;
+        return clamp((ring + ring2) * ad, 0.04, 1.45);
+      }
+
+      // GALLOP — 3-beat quick-quick-STRONG rhythm, 1–2 Hz
+      // Short-short-long: like a canter stride or a racing heartbeat with emphasis.
+      case "gallop": {
+        const rate = (1.0 + 1.0 * speedN) * rd;
+        const ph = (t * rate + seed * 0.25) % 1.0;
+        if (ph < 0.10)  return (ph / 0.10) * 1.15 * ad;
+        if (ph < 0.18)  return (1.15 - (ph - 0.10) / 0.08 * 1.05) * ad;
+        if (ph < 0.28)  return ((ph - 0.18) / 0.10) * 1.05 * ad;
+        if (ph < 0.36)  return (1.05 - (ph - 0.28) / 0.08 * 0.95) * ad;
+        if (ph < 0.65)  return (0.08 + Math.pow((ph - 0.36) / 0.29, 1.6) * 1.45) * ad;
+        if (ph < 0.80)  return (1.53 * Math.pow(1 - (ph - 0.65) / 0.15, 0.55)) * ad;
+        return 0.04;
+      }
+
+      // TEASE — very slow climb that approaches peak but always backs off before release
+      // Tantalizing: always building, never quite arriving.
+      case "tease": {
+        const rate = (0.12 + 0.08 * speedN) * rd;
+        const ph = (t * rate + seed * 0.15) % 1.0;
+        const rise = ph < 0.70
+          ? Math.pow(ph / 0.70, 0.65) * 0.88
+          : 0.88 - Math.pow((ph - 0.70) / 0.30, 0.5) * 0.52;
+        const tremor = 1 + 0.08 * Math.sin(t * 4.5 * rd + seed * 3.1);
+        return clamp(Math.max(0.04, rise) * tremor * ad, 0.04, 1.0);
+      }
+
+      // FLUTTER — paired wing-beats at 3–5 Hz with a pronounced rest between pairs
+      // Two quick pulses, then silence; like butterfly wings or a hummingbird hovering.
+      case "flutter": {
+        const rate = (3.0 + 2.0 * speedN) * rd;
+        const ph = (t * rate + seed * 0.5) % 1.0;
+        const pairDuty = 0.22 * dd;
+        if (ph < pairDuty * 0.45) {
+          const bp = ph / (pairDuty * 0.45);
+          return (Math.sin(bp * Math.PI) * 1.10 + 0.05) * ad;
+        }
+        if (ph < pairDuty) {
+          const bp = (ph - pairDuty * 0.45) / (pairDuty * 0.55);
+          return (Math.sin(bp * Math.PI) * 0.78 + 0.05) * ad;
+        }
+        return 0.04; // rest — wings folded
+      }
+
+      // Legacy patterns kept for compatibility
       case "breath": {
         const a = 0.6 + 0.4 * Math.sin(t * 0.9 + seed);
         const sigh = Math.sin(t * 0.7 + seed) > 0.96 ? 1.25 : 1.0;
@@ -355,15 +933,6 @@ const SOUND_LIB = {
       case "staccato": {
         const r = 2.2 + 3.0 * speedN;
         return ((t * r) % 1.0) < 0.14 ? 1.3 : 0.05;
-      }
-      case "talk": {
-        const r = 1.2 + 3.2 * speedN;
-        const ph = (t * r + seed * 0.17) % 1.0;
-        return ph < 0.10 ? 1.25 : (ph < 0.22 ? 0.55 : 0.12);
-      }
-      case "swell": {
-        const a = 0.65 + 0.35 * Math.sin(t * 0.75 + seed);
-        return a * a;
       }
       default:
         return 1.0;
@@ -615,7 +1184,8 @@ audio(t, dt, baseHz, chMult, world) {
       const freq = clamp((this.noteHz * vib) + freqJitter, 20, 1500);
 
       // 7. AMPLITUDE & SPECTRUM FIX
-      const gate = gateFor(lib, localT, speedN, (this.host.seed || 0) + this.id * 11.7);
+      // Pass per-host ADSR drift so each creature has its own slowly-evolving timing
+      const gate = gateFor(lib, localT, speedN, (this.host.seed || 0) + this.id * 11.7, this.host.adsrDrift);
       const dyn = lerp(0.04 + 0.18 * energy, 0.35 + 0.75 * energy, speedN);
       let amp = dyn * gate * energy;
       amp = clamp(amp + this._applyEcho(dt), 0, 1.25);
@@ -642,13 +1212,33 @@ class Agent {
       this.maturity = isBaby ? 0.2 : 1.0; 
       this.energy = 1.0; this.health = 1.0; this.age = 0;
 
-      // FIX: Individualized Heartbeat
-      this.timeScale = rand(0.7, 1.3); 
+      // Individualized tempo scale (heartbeats never sync up between creatures)
+      this.timeScale = rand(0.7, 1.3);
 
-      const colors = { 
-        bacteria: [180, 240, 255], archaea: [255, 150, 100], 
-        flagellate: [205, 140, 235], lattice: [145, 255, 175], 
-        mycelium: [170, 120, 255], scintillator: [180, 230, 255] 
+      // Smooth wander bias (Ornstein-Uhlenbeck): slowly-drifting heading bias.
+      // Replaces raw frame-by-frame noise so creatures sweep in lazy organic arcs.
+      this.wanderBias = rand(-0.4, 0.4);
+
+      // ADSR Drift — slowly evolving envelope variation per individual
+      // Each creature independently drifts its gate timing and amplitude over time.
+      this.adsrDrift = {
+        rateMul: rand(0.88, 1.12), // gate tempo multiplier
+        ampMul:  rand(0.92, 1.08), // peak amplitude multiplier
+        dutyMul: rand(0.85, 1.15)  // on/off duty cycle multiplier (for pulse gates)
+      };
+      this.adsrDriftTimer = rand(12, 28); // seconds until next random nudge
+
+      const colors = {
+        bacteria:     [165, 235, 255], // Jellyfish       — cool aqua
+        archaea:      [255, 200, 130], // Radiolarian     — warm amber
+        flagellate:   [140, 255, 210], // Siphonophore    — iridescent teal
+        lattice:      [145, 255, 168], // Polychaete      — green-gold
+        mycelium:     [195,  95, 235], // Nudibranch      — deep purple-magenta
+        scintillator: [155, 220, 255], // Glass Squid     — ice blue
+        ctenophore:   [175, 255, 238], // Ctenophore      — iridescent cyan-mint
+        mantis:       [255, 205, 100], // Mantis Shrimp   — warm golden-orange
+        pyrosome:     [162, 255, 182], // Pyrosome        — bioluminescent pale green
+        seaangel:     [215, 185, 255], // Sea Angel       — pale lavender
       };
       this.baseRgb = colors[sid] || [255, 255, 255];
       this.currRgb = [...this.baseRgb]; this.currAlpha = 0; this.r = 0; this.stomach = [];
@@ -662,6 +1252,18 @@ class Agent {
 
     step(dt, world) {
       this.age += dt;
+
+      // ADSR drift: random-walk envelope parameters every ~15-25 seconds
+      // Keeps each creature's sensation subtly different from others of the same species.
+      this.adsrDriftTimer -= dt;
+      if (this.adsrDriftTimer <= 0) {
+        this.adsrDriftTimer = rand(12, 28);
+        const nudge = (v, lo, hi, step) => clamp(v + (Math.random() - 0.5) * step, lo, hi);
+        this.adsrDrift.rateMul = nudge(this.adsrDrift.rateMul, 0.62, 1.48, 0.10);
+        this.adsrDrift.ampMul  = nudge(this.adsrDrift.ampMul,  0.78, 1.22, 0.07);
+        this.adsrDrift.dutyMul = nudge(this.adsrDrift.dutyMul, 0.65, 1.42, 0.12);
+      }
+
       if (this.state === "dying") {
         this.vx *= 0.85; this.vy *= 0.85; 
         this.z = lerp(this.z, -1.0, dt * 0.4);
@@ -694,37 +1296,57 @@ class Agent {
         }
       }
 
+      // ── SMOOTH WANDER (Ornstein-Uhlenbeck) ─────────────────────────────────
+      // wanderBias is a slowly-drifting heading offset. It accumulates small
+      // nudges each frame then exponentially decays back toward zero, producing
+      // lazy sweeping arcs instead of jittery frame-by-frame noise.
+      const wanderAmt = (this.profile?.wander || 0.02);
+      this.wanderBias += (Math.random() - 0.5) * wanderAmt * dt * 22;
+      this.wanderBias *= 1 - dt * 1.8;                    // mean-reversion rate
+      this.wanderBias = clamp(this.wanderBias, -1.3, 1.3); // prevent full-spin drift
+
       if (closestInterest) {
+        // Pursuit: steer toward interest; let wanderBias keep drifting (invisible)
         targetHeading = Math.atan2(closestInterest.y - this.y, closestInterest.x - this.x);
         if (minDist < this.r + 0.015) {
           if (closestInterest instanceof NutrientBlob) {
             this.absorb(closestInterest.profile.tint, closestInterest.consume(dt * 0.2));
-          } else { 
-            this.absorb(closestInterest.currRgb, 0.5); closestInterest.health = 0; 
+          } else {
+            this.absorb(closestInterest.currRgb, 0.5); closestInterest.health = 0;
           }
         }
-      } else { 
-        this.heading += (Math.random() - 0.5) * (this.profile?.wander || 0.02); 
+      } else {
+        // No target: apply wander bias so we drift in smooth arcs
+        targetHeading = this.heading + this.wanderBias;
       }
-      
-      // FIX: STRONG CIRCULAR CONTAINMENT
+
+      // ── SOFT CIRCULAR BOUNDARY ──────────────────────────────────────────────
+      // Gently bends targetHeading (not heading itself) back toward center.
+      // Strength is capped so the turn goes through the normal smooth filter.
       const distFromCenter = Math.hypot(this.x - 0.5, this.y - 0.5);
-      if (distFromCenter > 0.43) {
+      if (distFromCenter > 0.42) {
         const angleToCenter = Math.atan2(0.5 - this.y, 0.5 - this.x);
-        // Forcefully steer back and dampen velocity to prevent "glitching" out
-        this.heading = lerp(this.heading, angleToCenter, (distFromCenter - 0.43) * 5.0);
-        this.vx *= 0.9; 
-        this.vy *= 0.9;
+        const strength = clamp((distFromCenter - 0.42) * 3.5, 0, 0.72);
+        let bd = angleToCenter - targetHeading;
+        while (bd < -Math.PI) bd += TAU; while (bd > Math.PI) bd -= TAU;
+        targetHeading += bd * strength;
+        // Dampen velocity proportionally (dt-scaled)
+        const velDamp = 1 - clamp((distFromCenter - 0.42) * 2.5, 0, 0.18) * dt * 30;
+        this.vx *= velDamp; this.vy *= velDamp;
       }
-      
+
       if (this.energy > 1.8 && this.maturity > 0.9 && world.agents.length < 60) {
-        this.energy = 0.7; 
+        this.energy = 0.7;
         world.agents.push(new Agent(this.speciesId, this.x + rand(-0.01, 0.01), this.y + rand(-0.01, 0.01), true));
       }
-      
+
+      // ── DT-SCALED HEADING TURN ──────────────────────────────────────────────
+      // Turn rate is scaled by dt so behaviour is framerate-independent.
+      // Capped at 0.20 rad/step to prevent snapping on large dt spikes.
       let hDiff = targetHeading - this.heading;
       while (hDiff < -Math.PI) hDiff += TAU; while (hDiff > Math.PI) hDiff -= TAU;
-      this.heading += hDiff * (this.profile?.turn || 0.01);
+      const turnRate = clamp((this.profile?.turn || 0.01) * dt * 30, 0, 0.20);
+      this.heading += hDiff * turnRate;
 
       // Movement influenced by individual timeScale
       const metabolicMult = (0.25 + (this.energy * 0.75)) * this.timeScale;
@@ -952,51 +1574,12 @@ class World {
     setCaretakerEnabled: (v) => engine.caretaker.enabled = v,
     setCaretakerIntensity: (v) => {
       engine.caretaker.influence = clamp(v / 100, 0.1, 5.0);
-    }
+    },
+    getCaretakerId: () => engine.caretaker.id,
+    getCaretakerIds: () => Object.keys(CARETAKER_DIETS)
   };
 
-  /** 
-   * SPECIES DEFINITIONS (v8.0 EXTENSION) 
-   * These were placed here to ensure SPECIES object is fully formed.
-   */
-  SPECIES.mycelium = {
-    name: "Hairy Blobs", speed: 0.00004, turn: 0.01, wander: 0.01, drag: 0.98,
-    coreRadius: 0.022, prefs: ["carbon", "sulfur"], reproduction: "spores",
-    makeNodes(a, t) {
-      const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: a.currRgb, a: a.currAlpha, s: 0.3 }];
-      if (a.state === "alive") {
-        const localT = t * a.timeScale;
-        // Reduced node count and softness to prevent the "smear ring"
-        for (let i = 0; i < 14; i++) {
-          const ang = (i / 14) * TAU + Math.sin(localT * 4 + i);
-          // Hairs now vary in length and are anchored to the core
-          const hairLen = a.r * (1.1 + Math.sin(localT * 5 + i * 2) * 0.4);
-          const [dx, dy] = rotate2(hairLen, 0, ang);
-          
-          // Draw hairs as two nodes to create a "line" look
-          ns.push({ x: a.x + dx * 0.5, y: a.y + dy * 0.5, z: a.z, r: a.r * 0.2, rgb: a.currRgb, a: a.currAlpha * 0.5, s: 0.2 });
-          ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.15, rgb: a.currRgb, a: a.currAlpha * 0.3, s: 0.1 });
-        }
-      }
-      return ns;
-    }
-  };
-
-  SPECIES.scintillator = {
-    name: "Abyssal Pulsars", speed: 0.0002, turn: 0.1, wander: 0.08, drag: 0.92,
-    coreRadius: 0.012, prefs: ["iron", "water"], reproduction: "mitosis",
-    makeNodes(a, t) {
-      const ns = [{ x: a.x, y: a.y, z: a.z, r: a.r, rgb: [180, 230, 255], a: a.currAlpha, s: 0.05 }];
-      if (a.state === "alive") {
-        const pulse = Math.sin(t * 10 + a.seed) * 0.5 + 0.5;
-        for (let i = 0; i < 8; i++) {
-          const tailAng = a.heading + Math.PI + (i-3.5) * 0.2;
-          const [dx, dy] = rotate2(a.r * (1.5 + pulse * 0.5), 0, tailAng);
-          ns.push({ x: a.x + dx, y: a.y + dy, z: a.z, r: a.r * 0.4, rgb: a.currRgb, a: a.currAlpha * 0.2, s: 0.6 });
-        }
-      }
-      return ns;
-    }
-  };
+  // All 6 species are now fully defined in the SPECIES object above.
+  // (Legacy SPECIES.mycelium / SPECIES.scintillator overrides removed in v9.0)
 
 })();

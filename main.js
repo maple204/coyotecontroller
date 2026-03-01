@@ -11,6 +11,107 @@ function updateCaretakerIntensityLabel(){
   labA.textContent = `${parseInt(sl.value || "100", 10)}%`;
 }
 
+// --- Biome Caretaker: start/stop + random mode ---
+let _caretakerActive = false;
+let _randomCaretakerMode = false;
+let _randomCaretakerTimer = null;
+
+function _applyCaretaker(id) {
+  const intensity = parseFloat($("caretakerIntensity")?.value || "100") / 100;
+  if (window.BiomeEngine) {
+    window.BiomeEngine.setCaretaker(id, _caretakerActive, intensity);
+  }
+  const sel = $("caretakerSelect");
+  if (sel && sel.value !== id) sel.value = id;
+}
+
+function _updateCaretakerBtnUI() {
+  const btn = $("caretakerBtn");
+  if (!btn) return;
+  btn.textContent = _caretakerActive ? "Stop" : "Start";
+  btn.classList.toggle("running", _caretakerActive);
+}
+
+function _scheduleNextRandomCaretaker() {
+  if (!_randomCaretakerMode) return;
+  const delaySec = 60 + Math.random() * 120; // 60–180 seconds
+  _randomCaretakerTimer = setTimeout(() => {
+    if (!_randomCaretakerMode) return;
+    const ids = (window.BiomeEngine && window.BiomeEngine.getCaretakerIds)
+      ? window.BiomeEngine.getCaretakerIds()
+      : ["gardener", "bloom", "ballast", "ironbeat", "sulfuric", "drifter"];
+    const currentId = (window.BiomeEngine && window.BiomeEngine.getCaretakerId)
+      ? window.BiomeEngine.getCaretakerId()
+      : ($("caretakerSelect")?.value || "gardener");
+    const others = ids.filter(id => id !== currentId);
+    const nextId = others.length > 0 ? others[Math.floor(Math.random() * others.length)] : ids[0];
+    _applyCaretaker(nextId);
+    _scheduleNextRandomCaretaker();
+  }, delaySec * 1000);
+}
+
+function _startRandomCaretakerMode() {
+  _randomCaretakerMode = true;
+  _caretakerActive = true;
+  _updateCaretakerBtnUI();
+  _applyCaretaker($("caretakerSelect")?.value || "gardener");
+  const rbtn = $("randomCaretakerBtn");
+  if (rbtn) { rbtn.classList.add("active"); rbtn.textContent = "🎲 Random ON"; }
+  _scheduleNextRandomCaretaker();
+}
+
+function _stopRandomCaretakerMode() {
+  _randomCaretakerMode = false;
+  clearTimeout(_randomCaretakerTimer);
+  _randomCaretakerTimer = null;
+  const rbtn = $("randomCaretakerBtn");
+  if (rbtn) { rbtn.classList.remove("active"); rbtn.textContent = "🎲 Random"; }
+}
+
+function bindCaretakerControls() {
+  // Start/Stop caretaker button
+  const caretakerBtn = $("caretakerBtn");
+  if (caretakerBtn && !caretakerBtn.dataset.bound) {
+    caretakerBtn.dataset.bound = "1";
+    caretakerBtn.addEventListener("click", () => {
+      _caretakerActive = !_caretakerActive;
+      if (!_caretakerActive && _randomCaretakerMode) _stopRandomCaretakerMode();
+      _applyCaretaker($("caretakerSelect")?.value || "gardener");
+      _updateCaretakerBtnUI();
+    });
+  }
+  // Caretaker select change while running
+  const caretakerSelect = $("caretakerSelect");
+  if (caretakerSelect && !caretakerSelect.dataset.caretakerBound) {
+    caretakerSelect.dataset.caretakerBound = "1";
+    caretakerSelect.addEventListener("change", () => {
+      if (_caretakerActive) _applyCaretaker(caretakerSelect.value);
+    });
+  }
+  // Random caretaker toggle button
+  const randomBtn = $("randomCaretakerBtn");
+  if (randomBtn && !randomBtn.dataset.bound) {
+    randomBtn.dataset.bound = "1";
+    randomBtn.addEventListener("click", () => {
+      if (_randomCaretakerMode) _stopRandomCaretakerMode();
+      else _startRandomCaretakerMode();
+    });
+  }
+  // Intensity slider: update engine live
+  const ci = $("caretakerIntensity");
+  if (ci && !ci.dataset.intensityBound) {
+    ci.dataset.intensityBound = "1";
+    const onIntensity = () => {
+      updateCaretakerIntensityLabel();
+      if (_caretakerActive && window.BiomeEngine) {
+        window.BiomeEngine.setCaretakerIntensity(parseFloat(ci.value || "100"));
+      }
+    };
+    ci.addEventListener("input",  onIntensity);
+    ci.addEventListener("change", onIntensity);
+  }
+}
+
 (() => {
   "use strict";
 
@@ -32,7 +133,7 @@ function updateCaretakerIntensityLabel(){
   const FMIN = 20, FMAX = 1500;
   const STORAGE_KEY = "coyoteController.v8";
   let APP_MODE = "control";
-  const PHASE_UI_DISABLED = true;
+  let PHASE_UI_DISABLED = true; // toggled dynamically when a DAC slot is active
 
   // -------- DOM Elements (Defined ONLY ONCE) --------
   const overlay = $("debugOverlay");
@@ -132,6 +233,8 @@ function updateCaretakerIntensityLabel(){
     } else {
       if (window.BiomeEngine) window.BiomeEngine.setEnabled(false);
     }
+    // Phase visibility depends on mode — update whenever mode changes
+    try { updatePhaseUIState(); } catch {}
   }
 
   stopBtn?.addEventListener("click", () => {
@@ -328,6 +431,56 @@ function cycleRouteValue(v, options){
         }
       });
     }
+  }
+
+  // -------- Phase control visibility (shown only when a DAC slot is active, in control mode) --------
+  function updatePhaseUIState() {
+    const anyDac = !!(slotDac?.primary?.ctx || slotDac?.secondary?.ctx);
+    // Show phase only in control mode with at least one DAC slot connected
+    const showPhase = anyDac && (APP_MODE === 'control');
+    PHASE_UI_DISABLED = !showPhase;
+
+    // Toggle body class so CSS can show/hide the phase control groups
+    document.body.classList.toggle('dac-slot-active', showPhase);
+
+    // Snap buttons were hidden via inline style in boot — sync them here
+    for (let i = 0; i < 4; i++) {
+      if (snapPhaseBtn[i]) snapPhaseBtn[i].style.display = showPhase ? '' : 'none';
+      if (snapCycleBtn[i]) snapCycleBtn[i].style.display = showPhase ? '' : 'none';
+    }
+  }
+
+  // -------- Strength-Duration curve gain for flat sensation across frequencies --------
+  // Formula: Ith(f) = I₀ × (1 + 2 × CHRONAXIE × f)  [for sine carrier, PW ≈ half-period]
+  // Gain is normalised to SD_F_REF so sensation at that frequency is unaltered.
+  // Frequencies above the reference get a boost (more current needed); below get a cut.
+  const SD_CHRONAXIE_S = 0.000354; // 354 µs chronaxie
+  const SD_F_REF = 500;            // reference frequency — no gain change at this point
+
+  function sdCurveGain(freqHz) {
+    const f = clamp(freqHz, 20, 1500);
+    return (1 + 2 * SD_CHRONAXIE_S * f) / (1 + 2 * SD_CHRONAXIE_S * SD_F_REF);
+  }
+
+  // Apply SD compensation to one channel's effective amplitude, clamped to its maxCap for safety.
+  // CH0/CH1 (indices 0,1) belong to the primary slot; CH2/CH3 (indices 2,3) to the secondary slot.
+  function sdAmp(ch) {
+    const a = applied.ampEff[ch];
+    const eqId = (ch < 2) ? 'primaryDacEQ' : 'secondaryDacEQ';
+    if (!$(eqId)?.checked) return a;
+    return clamp(a * sdCurveGain(applied.freqHz[ch]), 0, maxCap[ch] || 1);
+  }
+
+  // Show/hide the DAC settings panel and per-slot sub-sections based on slot connection state.
+  function updateDacSettingsPanel() {
+    const pActive = !!slotDac.primary.ctx;
+    const sActive = !!slotDac.secondary.ctx;
+    const panel = $('dacSettingsPanel');
+    if (panel) panel.style.display = (pActive || sActive) ? '' : 'none';
+    const pSettings = $('primaryDacSettings');
+    if (pSettings) pSettings.style.display = pActive ? '' : 'none';
+    const sSettings = $('secondaryDacSettings');
+    if (sSettings) sSettings.style.display = sActive ? '' : 'none';
   }
 
   function openMaxDialog(i) {
@@ -1286,6 +1439,285 @@ function renderFieldRich(dt) {
     return { type: 'params', amp: [applied.ampEff[0], applied.ampEff[1], applied.ampEff[2], applied.ampEff[3]], freq: [applied.freqHz[0], applied.freqHz[1], applied.freqHz[2], applied.freqHz[3]], phase: [applied.phaseRad[0], applied.phaseRad[1], applied.phaseRad[2], applied.phaseRad[3]] };
   }
 
+  // -------- DAC Audio Output --------
+  // Outputs directly to a stereo audio interface as an alternative to Bluetooth.
+  // Left → estim box Channel A, Right → estim box Channel B (universal convention).
+  // Frequency range 20–1500 Hz maps 1:1 to audio output — no remapping needed since
+  // this falls well within the human estim response range (30 Hz–~6 kHz).
+  // Waveform options: sine (smooth), triangle (sharper attack), square (most intense).
+
+  const DAC_WORKLET_CODE = `
+class DacSynth extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.sr = sampleRate;
+    this.phase = [0,0,0,0];
+    this.amp   = [0,0,0,0]; this.tAmp  = [0,0,0,0];
+    this.freq  = [200,200,200,200]; this.tFreq = [200,200,200,200];
+    this.phOff = [0,0,0,0]; this.tPhOff = [0,0,0,0];
+    // routeL/R: 0 or 1 per channel — contribution to left/right output
+    this.routeL = [1,0,1,0];
+    this.routeR = [0,1,0,1];
+    this.level = 1.0;
+    this.waveType = 0; // 0=sine, 1=triangle, 2=square
+    this.port.onmessage = (e) => {
+      const p = e.data;
+      if (!p || !p.type) return;
+      if (p.type === 'params') {
+        if (p.amp)    this.tAmp   = p.amp;
+        if (p.freq)   this.tFreq  = p.freq;
+        if (p.phase)  this.tPhOff = p.phase;
+        if (p.routeL != null) this.routeL = p.routeL;
+        if (p.routeR != null) this.routeR = p.routeR;
+        if (p.level  != null) this.level  = p.level;
+        if (p.waveType != null) this.waveType = p.waveType;
+      }
+    };
+  }
+  slew(c, t, dt, tau) { tau = Math.max(1e-4, tau); return c + (t - c) * (1 - Math.exp(-dt / tau)); }
+  wave(ph, type) {
+    const TAU = 6.283185307;
+    const p = ((ph % TAU) + TAU) % TAU;
+    if (type === 1) { const u = p / TAU; return u < 0.5 ? 4*u - 1 : 3 - 4*u; }   // triangle
+    if (type === 2) { return p < 3.14159265 ? 1 : -1; }                            // square
+    return Math.sin(ph);                                                            // sine
+  }
+  process(inputs, outputs) {
+    const outL = outputs[0][0], outR = outputs[0][1];
+    const n = outL.length, dt = n / this.sr;
+    for (let i = 0; i < 4; i++) {
+      this.amp[i]   = this.slew(this.amp[i],   this.tAmp[i]   || 0,   dt, 0.04);
+      this.freq[i]  = this.slew(this.freq[i],  this.tFreq[i]  || 200, dt, 0.08);
+      this.phOff[i] = this.slew(this.phOff[i], this.tPhOff[i] || 0,   dt, 0.10);
+    }
+    const wt = this.waveType, lv = this.level;
+    const TAU = 6.283185307;
+    for (let s = 0; s < n; s++) {
+      let l = 0, r = 0;
+      for (let ch = 0; ch < 4; ch++) {
+        this.phase[ch] += TAU * this.freq[ch] / this.sr;
+        if (this.phase[ch] > 1e6) this.phase[ch] %= TAU;
+        const v = (this.amp[ch] || 0) * this.wave(this.phase[ch] + (this.phOff[ch] || 0), wt);
+        l += v * this.routeL[ch];
+        r += v * this.routeR[ch];
+      }
+      outL[s] = l * lv;
+      outR[s] = r * lv;
+    }
+    return true;
+  }
+}
+registerProcessor('dac-synth', DacSynth);
+`;
+
+  const dac = { enabled: false, ctx: null, node: null, gain: null, deviceId: 'default', lastSend: 0 };
+  const dacBtn = $("dacBtn");
+
+  async function ensureDacAudio() {
+    if (dac.ctx) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+      const blob = new Blob([DAC_WORKLET_CODE], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      const node = new AudioWorkletNode(ctx, "dac-synth", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0;
+      node.connect(gain).connect(ctx.destination);
+      dac.ctx = ctx; dac.node = node; dac.gain = gain;
+    } catch(e) { console.error("DAC init failed:", e); setOverlay("DAC init failed: " + e.message); }
+  }
+
+  async function setDacEnabled(on) {
+    dac.enabled = !!on;
+    await ensureDacAudio();
+    if (!dac.ctx) return;
+    if (dac.ctx.state !== "running") { try { await dac.ctx.resume(); } catch {} }
+    const targetGain = on ? clamp(parseFloat($("dacLevel")?.value || "100") / 100, 0, 2) : 0.0;
+    dac.gain.gain.setTargetAtTime(targetGain, dac.ctx.currentTime, 0.03);
+    if (dacBtn) dacBtn.textContent = `DAC: ${on ? "On" : "Off"}`;
+    dacBtn?.classList.toggle("dac-active", on);
+  }
+
+  async function setDacDevice(deviceId) {
+    dac.deviceId = deviceId || 'default';
+    if (!dac.ctx) return;
+    try {
+      if (typeof dac.ctx.setSinkId === 'function') {
+        await dac.ctx.setSinkId(dac.deviceId);
+      }
+    } catch(e) { console.warn("setSinkId not supported or failed:", e); }
+  }
+
+  async function enumDacDevices() {
+    const sel = $("dacDeviceSelect");
+    if (!sel) return;
+    try {
+      // Request audio permission so labels are available
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch {}
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputs = devices.filter(d => d.kind === 'audiooutput');
+      sel.innerHTML = '<option value="default">Default Output</option>';
+      outputs.forEach((d, idx) => {
+        const opt = document.createElement("option");
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `Output ${idx + 1}`;
+        if (d.deviceId === dac.deviceId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    } catch(e) { console.warn("Cannot enumerate audio outputs:", e); }
+  }
+
+  function buildDacParamMessage() {
+    const routeL = [1,2,3,4].map(i => $(`dacL${i}`)?.checked ? 1 : 0);
+    const routeR = [1,2,3,4].map(i => $(`dacR${i}`)?.checked ? 1 : 0);
+    const waveType = parseInt($("dacWaveform")?.value || "0", 10);
+    return {
+      type: 'params',
+      amp:     [sdAmp(0), sdAmp(1), sdAmp(2), sdAmp(3)],
+      freq:    [...applied.freqHz],
+      phase:   [...applied.phaseRad],
+      routeL, routeR,
+      level: 1.0,
+      waveType
+    };
+  }
+
+  function syncDacGain() {
+    if (!dac.gain || !dac.enabled) return;
+    const v = clamp(parseFloat($("dacLevel")?.value || "100") / 100, 0, 2);
+    dac.gain.gain.setTargetAtTime(v, dac.ctx?.currentTime ?? 0, 0.05);
+  }
+
+  // DAC UI event listeners
+  dacBtn?.addEventListener("click", () => setDacEnabled(!dac.enabled));
+
+  $("dacDeviceSelect")?.addEventListener("change", (e) => setDacDevice(e.target.value));
+
+  $("dacRefreshDevices")?.addEventListener("click", () => enumDacDevices());
+
+  $("dacLevel")?.addEventListener("input", () => {
+    const v = Math.round(parseFloat($("dacLevel")?.value || "100"));
+    if ($("dacLevelVal")) $("dacLevelVal").textContent = `${v}%`;
+    syncDacGain();
+  });
+
+// -------- DAC Slot connections (per-slot audio output, independent of global DAC panel) --------
+  // Primary slot: CH1 → L, CH2 → R on the chosen audio device
+  // Secondary slot: CH3 → L, CH4 → R on the chosen audio device
+  const slotDac = {
+    primary:   { ctx: null, node: null, gain: null, deviceId: null, label: null, lastSend: 0 },
+    secondary: { ctx: null, node: null, gain: null, deviceId: null, label: null, lastSend: 0 },
+  };
+
+  async function dacConnectSlot(which, deviceId, label) {
+    const slot = slotDac[which];
+    // Close any existing DAC context for this slot
+    if (slot.ctx) { try { slot.gain?.gain.setValueAtTime(0, slot.ctx.currentTime); await slot.ctx.close(); } catch {} }
+    slot.ctx = null; slot.node = null; slot.gain = null; slot.deviceId = null; slot.label = null;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+      if (deviceId && deviceId !== 'default' && typeof ctx.setSinkId === 'function') {
+        await ctx.setSinkId(deviceId);
+      }
+      const blob = new Blob([DAC_WORKLET_CODE], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      const node = new AudioWorkletNode(ctx, 'dac-synth', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+      const gain = ctx.createGain();
+      gain.gain.value = 1.0;
+      node.connect(gain).connect(ctx.destination);
+      slot.ctx = ctx; slot.node = node; slot.gain = gain;
+      slot.deviceId = deviceId; slot.label = label;
+      // Immediately send silence so the worklet is initialized
+      const isSecondary = (which === 'secondary');
+      node.port.postMessage({ type: 'params',
+        amp: [0,0,0,0], freq: [200,200,200,200], phase: [0,0,0,0],
+        routeL: isSecondary ? [0,0,1,0] : [1,0,0,0],
+        routeR: isSecondary ? [0,0,0,1] : [0,1,0,0],
+        level: 1.0, waveType: 0 });
+      updateBtStatus();
+      updatePhaseUIState();
+      updateDacSettingsPanel();
+    } catch(e) {
+      console.error("DAC slot connect failed:", e);
+      setOverlay("DAC connect failed: " + (e?.message || e));
+    }
+  }
+
+  async function dacDisconnectSlot(which) {
+    const slot = slotDac[which];
+    if (slot.ctx) {
+      try { slot.gain?.gain.setValueAtTime(0, slot.ctx.currentTime); } catch {}
+      try { await slot.ctx.close(); } catch {}
+    }
+    slot.ctx = null; slot.node = null; slot.gain = null; slot.deviceId = null; slot.label = null;
+    updatePhaseUIState();
+    updateDacSettingsPanel();
+  }
+
+  // -------- Connect picker dialog --------
+  let _connectSlotTarget = 'primary'; // which slot is being connected
+
+  async function openConnectDialog(which) {
+    _connectSlotTarget = which;
+    const title = $('connectDialogTitle');
+    if (title) title.textContent = `Connect ${which === 'primary' ? 'Primary (CH1/CH2)' : 'Secondary (CH3/CH4)'}`;
+    await populateConnectDeviceList();
+    try { $('connectDialog')?.showModal(); } catch {}
+  }
+
+  async function populateConnectDeviceList() {
+    const list = $('connectDeviceList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // --- Bluetooth option ---
+    const btBtn = document.createElement('button');
+    btBtn.className = 'connect-device-btn';
+    btBtn.innerHTML = `<span class="connect-dev-icon">&#x25C6;</span><div class="connect-dev-info"><span class="connect-dev-name">Bluetooth — Coyote</span><span class="connect-dev-sub">Scan for DG-LAB / Coyote v2 or v3 devices</span></div>`;
+    btBtn.addEventListener('click', () => {
+      try { $('connectDialog')?.close(); } catch {}
+      btConnect(_connectSlotTarget);
+    });
+    list.appendChild(btBtn);
+
+    // --- Audio output devices ---
+    try {
+      // Request audio permission so device labels are available
+      try { await navigator.mediaDevices.getUserMedia({ audio: true }); } catch {}
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputs = devices.filter(d => d.kind === 'audiooutput');
+      outputs.forEach((d, idx) => {
+        const lbl = d.label || `Audio Output ${idx + 1}`;
+        const btn = document.createElement('button');
+        btn.className = 'connect-device-btn';
+        btn.innerHTML = `<span class="connect-dev-icon">&#x25C8;</span><div class="connect-dev-info"><span class="connect-dev-name">${lbl}</span><span class="connect-dev-sub">DAC audio output &mdash; ${_connectSlotTarget === 'primary' ? 'CH1&rarr;L, CH2&rarr;R' : 'CH3&rarr;L, CH4&rarr;R'}</span></div>`;
+        btn.addEventListener('click', () => {
+          try { $('connectDialog')?.close(); } catch {}
+          dacConnectSlot(_connectSlotTarget, d.deviceId, lbl);
+        });
+        list.appendChild(btn);
+      });
+      if (outputs.length === 0) {
+        const note = document.createElement('p');
+        note.className = 'connect-no-devices';
+        note.textContent = 'No audio output devices found. Connect a USB DAC and try again.';
+        list.appendChild(note);
+      }
+    } catch(e) {
+      console.warn("Cannot enumerate audio outputs:", e);
+      const note = document.createElement('p');
+      note.className = 'connect-no-devices';
+      note.textContent = 'Could not enumerate audio devices.';
+      list.appendChild(note);
+    }
+  }
+
+  $('connectCancel')?.addEventListener('click', () => { try { $('connectDialog')?.close(); } catch {} });
+
 // -------- Bluetooth transport (Restored v2 + v3 Support) --------
   const BT = {
     primary: { device: null, protocol: null, charV3: null, charV2AB2: null, charV2A34: null, charV2B34: null, lastOkMs: 0 },
@@ -1315,25 +1747,44 @@ function renderFieldRich(dt) {
 
   function updateBtStatus() {
     const now = performance.now();
-    const pOk = !!BT.primary.protocol && (now - (BT.primary.lastOkMs || 0) < 3000);
-    const sOk = !!BT.secondary.protocol && (now - (BT.secondary.lastOkMs || 0) < 3000);
+    const pBt = !!BT.primary.protocol && (now - (BT.primary.lastOkMs || 0) < 3000);
+    const sBt = !!BT.secondary.protocol && (now - (BT.secondary.lastOkMs || 0) < 3000);
+    const pDac = !!slotDac.primary.ctx;
+    const sDac = !!slotDac.secondary.ctx;
 
-    const set = (id, state) => {
+    const set = (id, state, isDac) => {
       const el = $(id); if (!el) return;
-      el.classList.remove("routeable","routeon");
+      el.classList.remove("routeable", "routeon", "dac-badge");
       el.textContent = state;
-      el.classList.toggle("connected", state === "Connected");
+      el.classList.toggle("connected", state === "Connected" || isDac);
+      el.classList.toggle("dac-badge", !!isDac);
     };
 
-    const pState = pOk ? "Connected" : "Disconnected";
-    const sState = sOk ? "Connected" : "Disconnected";
+    // --- Primary badges ---
+    if (pBt) {
+      set("devBadge1", "Connected", false); set("devBadge2", "Connected", false);
+    } else if (pDac) {
+      const lbl = slotDac.primary.label || "DAC";
+      const short = lbl.length > 16 ? lbl.slice(0, 14) + "…" : lbl;
+      set("devBadge1", "DAC: " + short, true); set("devBadge2", "DAC: " + short, true);
+    } else {
+      set("devBadge1", "Disconnected", false); set("devBadge2", "Disconnected", false);
+    }
 
-    set("devBadge1", pState); set("devBadge2", pState);
-    set("devBadge3", sState); set("devBadge4", sState);
+    // --- Secondary badges ---
+    if (sBt) {
+      set("devBadge3", "Connected", false); set("devBadge4", "Connected", false);
+    } else if (sDac) {
+      const lbl = slotDac.secondary.label || "DAC";
+      const short = lbl.length > 16 ? lbl.slice(0, 14) + "…" : lbl;
+      set("devBadge3", "DAC: " + short, true); set("devBadge4", "DAC: " + short, true);
+    } else {
+      set("devBadge3", "Disconnected", false); set("devBadge4", "Disconnected", false);
+    }
 
-    // Routing Logic for single-device connection
-    const pOnly = pOk && !sOk;
-    const sOnly = sOk && !pOk;
+    // BT-only routing hints (only relevant when no DAC slots are active)
+    const pOnly = pBt && !sBt && !pDac && !sDac;
+    const sOnly = sBt && !pBt && !pDac && !sDac;
 
     if (pOnly) {
       const b3 = $("devBadge3"); const b4 = $("devBadge4");
@@ -1345,7 +1796,7 @@ function renderFieldRich(dt) {
       if (b1) { b1.textContent = fmt(routeConfig.ch1); b1.classList.add("routeable"); b1.classList.toggle("routeon", routeConfig.ch1 !== "off"); }
       if (b2) { b2.textContent = fmt(routeConfig.ch2); b2.classList.add("routeable"); b2.classList.toggle("routeon", routeConfig.ch2 !== "off"); }
     }
-    
+
     [1,2,3,4].forEach(n => setChannelRoutedUI(n, routeConfig["ch"+n]));
   }
 
@@ -1414,10 +1865,13 @@ function renderFieldRich(dt) {
   }
 
   async function btDisconnectAll() {
-    try { BT.primary.device?.gatt?.disconnect(); } catch { } 
+    try { BT.primary.device?.gatt?.disconnect(); } catch { }
     try { BT.secondary.device?.gatt?.disconnect(); } catch { }
-    clearSlot(BT.primary); 
-    clearSlot(BT.secondary); 
+    clearSlot(BT.primary);
+    clearSlot(BT.secondary);
+    // Also disconnect DAC slots (dacDisconnectSlot already calls updatePhaseUIState)
+    await dacDisconnectSlot('primary');
+    await dacDisconnectSlot('secondary');
     updateBtStatus();
   }
 
@@ -1456,8 +1910,8 @@ function renderFieldRich(dt) {
     b4?.addEventListener("click", () => onClick("ch4"));
   }
 
-  connectPrimaryBtn?.addEventListener("click", () => btConnect("primary"));
-  connectSecondaryBtn?.addEventListener("click", () => btConnect("secondary"));
+  connectPrimaryBtn?.addEventListener("click", () => openConnectDialog("primary"));
+  connectSecondaryBtn?.addEventListener("click", () => openConnectDialog("secondary"));
   disconnectBtn?.addEventListener("click", () => btDisconnectAll());
   monitorBtn?.addEventListener("click", () => setMonitorEnabled(!audio.enabled));
 
@@ -1653,6 +2107,32 @@ function compileExpr(expr) {
     for (let i = 0; i < 4; i++) { envSlew[i] = expSlew(envSlew[i] || 0, applied.ampEff[i] || 0, dt, 0.04); }
     if (APP_MODE === "biome" && window.BiomeEngine) window.BiomeEngine.step(dt);
     if (audio.node && audio.ctx && now - audio.lastSend > 16) { audio.lastSend = now; audio.node.port.postMessage(buildAudioParamMessage()); }
+    if (dac.enabled && dac.node && dac.ctx && now - dac.lastSend > 16) { dac.lastSend = now; dac.node.port.postMessage(buildDacParamMessage()); }
+    // Per-slot DAC outputs — primary (CH1→L, CH2→R) and secondary (CH3→L, CH4→R)
+    {
+      const pWave = parseInt($("primaryDacWaveform")?.value   || "0", 10);
+      const sWave = parseInt($("secondaryDacWaveform")?.value || "0", 10);
+      const pSlot = slotDac.primary;
+      if (pSlot.ctx && pSlot.node && now - pSlot.lastSend > 16) {
+        pSlot.lastSend = now;
+        pSlot.node.port.postMessage({ type: 'params',
+          amp:    [sdAmp(0), sdAmp(1), 0, 0],
+          freq:   [applied.freqHz[0],  applied.freqHz[1],  200, 200],
+          phase:  [applied.phaseRad[0],applied.phaseRad[1],0, 0],
+          routeL: [1, 0, 0, 0], routeR: [0, 1, 0, 0],
+          level: 1.0, waveType: pWave });
+      }
+      const sSlot = slotDac.secondary;
+      if (sSlot.ctx && sSlot.node && now - sSlot.lastSend > 16) {
+        sSlot.lastSend = now;
+        sSlot.node.port.postMessage({ type: 'params',
+          amp:    [0, 0, sdAmp(2), sdAmp(3)],
+          freq:   [200, 200, applied.freqHz[2],  applied.freqHz[3]],
+          phase:  [0, 0, applied.phaseRad[2], applied.phaseRad[3]],
+          routeL: [0, 0, 1, 0], routeR: [0, 0, 0, 1],
+          level: 1.0, waveType: sWave });
+      }
+    }
     btTick(nowSec);
   }
 
@@ -1686,6 +2166,7 @@ function compileExpr(expr) {
     bindRoutingBadges();
     bindUnmapButtons();
     updateBtStatus();
+    try { bindCaretakerControls(); } catch(e) { console.warn("bindCaretakerControls", e); }
     // Mode toggle (Control <-> Biome)
     const modeBtnEl = $("modeBtn");
     if (modeBtnEl && !modeBtnEl.dataset.bound) {
@@ -1721,25 +2202,32 @@ function compileExpr(expr) {
 // --- Find the end of your main.js and ensure this logic is present ---
 
   function setAppMode(mode){
-    APP_MODE = (mode === "biome") ? "biome" : "control"; 
+    APP_MODE = (mode === "biome") ? "biome" : "control";
     document.body.setAttribute("data-mode", APP_MODE);
     if ($("modeBtn")) $("modeBtn").textContent = (APP_MODE === "biome") ? "Mode: Biome" : "Mode: Control";
-    
+
     if (APP_MODE === "biome") {
-      refreshScriptSelectForMode(); 
+      refreshScriptSelectForMode();
       refreshCaretakerSelect();
-      if (window.BiomeEngine) { 
-        window.BiomeEngine.init(fieldCanvas, () => ({ 
-            baseHz: applied.baseHz, 
-            chMult: multSl.map(s => parseFloat(s.value)), 
-            t: performance.now()/1000 
-        })); 
+      try { bindCaretakerControls(); } catch {}
+      if (window.BiomeEngine) {
+        window.BiomeEngine.init(fieldCanvas, () => ({
+            baseHz: applied.baseHz,
+            chMult: multSl.map(s => parseFloat(s.value)),
+            t: performance.now()/1000
+        }));
         window.BiomeEngine.setEnabled(true);
+        // Sync caretaker state to engine on biome entry
+        const selId = $("caretakerSelect")?.value || "gardener";
+        const intensity = parseFloat($("caretakerIntensity")?.value || "100") / 100;
+        window.BiomeEngine.setCaretaker(selId, _caretakerActive, intensity);
       }
     } else {
-      refreshScriptSelectForMode(); 
+      refreshScriptSelectForMode();
       if (window.BiomeEngine) window.BiomeEngine.setEnabled(false);
     }
+    // Phase visibility depends on mode — update whenever mode changes
+    try { updatePhaseUIState(); } catch {}
   }
 
   // Emergency Stop Logic
