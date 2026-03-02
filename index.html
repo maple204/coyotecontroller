@@ -21,8 +21,7 @@
       <button id="connectSecondaryBtn" class="mode-btn">Connect Secondary</button>
       <button id="disconnectBtn" class="mode-btn">Disconnect</button>
       <button id="monitorBtn" class="mode-btn">Monitor: Off</button>
-            <button id="modeBtn" class="mode-btn">Mode: Control</button>
-<button id="guideBtn" class="mode-btn">User Guide</button>
+            <button id="modeBtn" class="mode-btn" title="Cycle: Control → Biome → Synth">Mode: Control</button>
     </div>
   </header>
 
@@ -200,6 +199,11 @@
       </div>
     </section>
 
+    <!-- Synth Mode panel — visible only in synth mode, built dynamically by SynthEngine -->
+    <section id="synthPanel" class="subpanel synth-only">
+      <div id="synthContent"><!-- populated by SynthEngine.buildSynthUI() --></div>
+    </section>
+
     <section id="biomePanel" class="subpanel biome-only">
       <div class="biome-hud">
         <div class="biome-hint">Use Feed buttons below.</div>
@@ -373,100 +377,6 @@
   </div>
 </dialog>
 
-<dialog id=”guideDialog”>
-  <h3 class=”dlg-title”>User Guide</h3>
-  <div class=”dlg-text” style=”line-height:1.5;”>
-
-    <p><strong>Getting started</strong></p>
-    <ol>
-      <li>Click <strong>Connect Primary</strong> or <strong>Connect Secondary</strong> — a picker will appear listing available Bluetooth Coyote devices and USB audio outputs (DACs). Primary controls CH1&nbsp;/&nbsp;CH2; Secondary controls CH3&nbsp;/&nbsp;CH4.</li>
-      <li>Set a <strong>Max</strong> limit for each channel you plan to use. Output is safety‑gated: <strong>no signal starts until at least one channel Max is above 0%</strong>.</li>
-      <li>Bring up <strong>Master Volume</strong> slowly. Use <strong>STOP</strong> to immediately set Master to 0 and center all cursors.</li>
-      <li>Optionally toggle <strong>Monitor</strong> to hear a preview mix through your speakers or headphones.</li>
-    </ol>
-
-    <p><strong>Connecting devices</strong></p>
-    <ul>
-      <li><strong>Bluetooth (DG-LAB Coyote V2/V3)</strong> — select from the browser’s Bluetooth picker. Channels pulse sequentially (never simultaneously).</li>
-      <li><strong>USB DAC / audio output</strong> — select any audio output device. The app synthesises a stereo signal: Left = odd channel, Right = even channel. Primary slot drives CH1 (L) and CH2 (R); Secondary drives CH3 (L) and CH4 (R).</li>
-    </ul>
-
-    <p><strong>DAC settings</strong></p>
-    <ul>
-      <li><strong>Waveform</strong> — choose the carrier shape sent to the DAC: Sine, Triangle, Square, or Sawtooth.</li>
-      <li><strong>S‑D Compensation</strong> — applies a Strength‑Duration curve correction so higher frequencies feel consistent in intensity. Leave <em>on</em> for most devices; turn <em>off</em> if your device already applies DSP internally.</li>
-      <li><strong>Phase &amp; Phase Cycle</strong> controls are only shown when a DAC slot is active. They offset or continuously rotate a channel’s phase — useful for creating stereo sweep effects between the two channels of a pair.</li>
-    </ul>
-
-    <p><strong>Channel controls</strong></p>
-    <ul>
-      <li><strong>Amplitude</strong> — the per-channel trim, bounded by that channel’s <strong>Max</strong> safety cap.</li>
-      <li><strong>Frequency Multiplier</strong> — scales Base Frequency independently per channel.</li>
-      <li><strong>Phase</strong> — static offset relative to the other channels (DAC only).</li>
-      <li><strong>Phase Cycle</strong> — continuously rotates phase over time (DAC only).</li>
-    </ul>
-
-    <p><strong>Touch / Vis pad</strong></p>
-    <ul>
-      <li>Controls two virtual sticks: one biases <strong>frequency &amp; phase</strong>, the other biases <strong>amplitude</strong>.</li>
-      <li>Drag toward a corner to emphasise that channel. Release to ease back to centre.</li>
-    </ul>
-
-    <p><strong>Motion scripts</strong></p>
-    <ul>
-      <li>Select a script and press <strong>Start</strong> to animate the pad automatically through parametric or keyframe paths.</li>
-      <li><strong>Script Intensity</strong> scales how far the motion reaches — keep Max caps conservative.</li>
-    </ul>
-
-    <p><strong>Biome mode</strong></p>
-    <p style=”margin:2px 0 6px;”>Switch to <strong>Mode: Biome</strong> to enter an autonomous deep-sea ecosystem. Four <em>Parasites</em> (the coloured rings) hunt creatures and latch on — each latched Parasite drives one audio channel based on that creature’s unique sensation character.</p>
-    <ul>
-      <li><strong>Jellyfish</strong> — slow rolling ocean swells (wave)</li>
-      <li><strong>Radiolarians</strong> — lub‑dub heartbeat double‑pulse</li>
-      <li><strong>Siphonophores</strong> — smooth silky continuous stroke</li>
-      <li><strong>Polychaetes</strong> — deep rhythmic power thrust</li>
-      <li><strong>Nudibranchs</strong> — liquid double‑harmonic swell</li>
-      <li><strong>Glass Squids</strong> — rapid electric buzz with AM envelope</li>
-      <li><strong>Ctenophores</strong> — expanding concentric ring ripples</li>
-      <li><strong>Mantis Shrimp</strong> — quick‑quick‑<em>STRONG</em> gallop punch</li>
-      <li><strong>Pyrosomes</strong> — very slow tease that climbs but never fully releases</li>
-      <li><strong>Sea Angels</strong> — delicate paired wing‑beat flutter with rest</li>
-    </ul>
-    <p style=”margin:4px 0 2px;”><em>ADSR drift:</em> each individual creature slowly evolves its own envelope timing over time, so no two of the same species ever feel identical.</p>
-
-    <p><strong>Caretaker</strong></p>
-    <ul>
-      <li>The Caretaker feeds nutrients into the ecosystem, shaping which species thrive and therefore which sensations dominate.</li>
-      <li>Press <strong>Start</strong> to activate the selected Caretaker; press again to stop.</li>
-      <li>Press <strong>🎲 Random</strong> to enter Random mode — the app automatically switches to a different Caretaker every 1–3 minutes, keeping the experience unpredictable. Press again to stop.</li>
-      <li><strong>Caretaker Influence</strong> controls how frequently nutrients are dropped — higher = faster ecosystem shifts.</li>
-      <li>Six Caretakers to choose from: <strong>Newton</strong> (growth &amp; blending), <strong>Curie</strong> (bloom &amp; spice), <strong>Faraday</strong> (stability &amp; depth), <strong>Feynman</strong> (rhythm &amp; iron), <strong>Darwin</strong> (complexity &amp; sulfur), <strong>Gauss</strong> (drift &amp; water).</li>
-    </ul>
-
-    <p><strong>Game controller (standard Gamepad API)</strong></p>
-    <ul>
-      <li><strong>Right stick</strong> — frequency / phase pad</li>
-      <li><strong>Left stick</strong> — amplitude pad</li>
-      <li><strong>Start</strong> — STOP (master to 0)</li>
-      <li><strong>L1 / R1</strong> — nudge Master Volume down / up</li>
-      <li><strong>L2 / R2</strong> — nudge Base Frequency down / up</li>
-      <li><strong>X / Y / A / B</strong> — select active channel</li>
-      <li><strong>D‑pad</strong> — adjust selected channel (Up/Down amplitude, Left/Right multiplier)</li>
-      <li><strong>Paddles / L3 / R3</strong> — nudge phase left / right</li>
-    </ul>
-
-    <p><strong>Tips</strong></p>
-    <ul>
-      <li>Always set <strong>Max</strong> caps before raising Master Volume.</li>
-      <li>In Biome mode, let the ecosystem run for a few minutes before adjusting — species populations shift naturally and so do the sensations.</li>
-      <li>Disconnect devices in‑app before powering them off.</li>
-    </ul>
-
-  </div>
-  <div class=”dlg-actions”>
-    <button id=”guideClose” class=”mode-btn”>Close</button>
-  </div>
-</dialog>
 <dialog id="maxDialog">
   <h3 class="dlg-title">Set Channel Max Limit</h3>
   <div class="dlg-text" id="maxDialogLabel">Max for CH?</div>
@@ -482,52 +392,75 @@
 
 <script>
 (function(){
+  // ── Safety dialog (native <dialog>) ──────────────────────────────────────
   const safety = document.getElementById('safetyDialog');
   const accept = document.getElementById('safetyAccept');
   const exitBtn = document.getElementById('safetyExit');
-  const guideBtn = document.getElementById('guideBtn');
-  const guide = document.getElementById('guideDialog');
-  const guideClose = document.getElementById('guideClose');
 
-  function safeShow(dlg){
-    if (!dlg) return;
-    try { if (!dlg.open) dlg.showModal(); } catch(e) { /* ignore */ }
-  }
-  function safeClose(dlg){
-    if (!dlg) return;
-    try { if (dlg.open) dlg.close(); } catch(e) { /* ignore */ }
-  }
+  function safeShow(dlg){ if (!dlg) return; try { if (!dlg.open) dlg.showModal(); } catch(e) {} }
+  function safeClose(dlg){ if (!dlg) return; try { if (dlg.open) dlg.close(); } catch(e) {} }
 
   window.addEventListener('DOMContentLoaded', () => {
-    // One-time safety notice per browser profile
     const KEY = 'coyote.safetyAccepted.v1';
-    const accepted = localStorage.getItem(KEY) === '1';
-    if (!accepted) safeShow(safety);
+    if (localStorage.getItem(KEY) !== '1') safeShow(safety);
   });
-
   accept && accept.addEventListener('click', () => {
     localStorage.setItem('coyote.safetyAccepted.v1', '1');
     safeClose(safety);
   });
-
   exitBtn && exitBtn.addEventListener('click', () => {
-    // Try to close the app window (works in Chrome app-mode). If blocked, at least close dialog.
     try { window.close(); } catch(e) {}
     safeClose(safety);
   });
 
-  guideBtn && guideBtn.addEventListener('click', () => safeShow(guide));
-  guideClose && guideClose.addEventListener('click', () => safeClose(guide));
+  // ── Guide overlay (plain div — no dialog API) ─────────────────────────────
+  const guideOverlay = document.getElementById('guideOverlay');
+  const guideBtn     = document.getElementById('guideBtn');
 
-  // Allow Escape to close guide (not safety)
+  function showGuide() {
+    if (!guideOverlay) return;
+    guideOverlay.style.display = 'flex';
+  }
+  function closeGuide() {
+    if (!guideOverlay) return;
+    guideOverlay.style.display = 'none';
+  }
+
+  guideBtn && guideBtn.addEventListener('click', showGuide);
+
+  // Close buttons (header X and footer Close)
+  ['guideClose', 'guideCloseFtr'].forEach(id => {
+    const btn = document.getElementById(id);
+    btn && btn.addEventListener('click', closeGuide);
+  });
+
+  // Click on backdrop (outside the white box) closes the guide
+  guideOverlay && guideOverlay.addEventListener('click', (e) => {
+    if (e.target === guideOverlay) closeGuide();
+  });
+
+  // Escape closes guide
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') safeClose(guide);
+    if (e.key === 'Escape') closeGuide();
+  });
+
+  // Tab switching
+  const guideTabs = document.querySelectorAll('.guide-tab');
+  guideTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      guideTabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.guide-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const target = document.getElementById(tab.dataset.panel);
+      if (target) target.classList.add('active');
+    });
   });
 })();
 </script>
   <!-- Move the STOP button here, and ONLY load the scripts once -->
   <button id="stopBtn" class="mode-btn stop-btn">STOP</button>
   <script src="biome_engine.js?v=5"></script>
-  <script src="main.js?v=205"></script>
+  <script src="synth_engine.js?v=3"></script>
+  <script src="main.js?v=211"></script>
 </body>
 </html>

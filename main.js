@@ -1255,6 +1255,205 @@ function cycleRouteValue(v, options){
     scopeCtx.fillText("Biome Spectrum", 12, 16);
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Gaussian Splat Particle System (Synth Mode visualizer)
+  // Replaces the flash-prone wave field when audio modifiers are active.
+  // Particles are emitted from each corner (one per channel), drift inward,
+  // Gaussian-blob rendered with screen-blending so colours mix naturally.
+  // ──────────────────────────────────────────────────────────────────────────
+  const SPLAT_MAX = 320;
+  const splatParticles = [];
+  const splatSmooth    = [0, 0, 0, 0];   // smoothed amplitude per channel
+
+  // Channel origins — match the four corners that drive the wave-field
+  const SPLAT_CORNERS = [
+    { x: 0.04, y: 0.04 },   // CH1 top-left
+    { x: 0.96, y: 0.04 },   // CH2 top-right
+    { x: 0.04, y: 0.96 },   // CH3 bottom-left
+    { x: 0.96, y: 0.96 },   // CH4 bottom-right
+  ];
+  const SPLAT_RGB = [
+    [0,   170, 255],   // CH1 blue
+    [255, 80,  80 ],   // CH2 red
+    [80,  255, 140],   // CH3 green
+    [255, 210, 80 ],   // CH4 yellow
+  ];
+
+  function updateAndRenderSplats(dt) {
+    if (!fieldCanvas || !fieldCtx) return;
+    const w   = fieldCanvas.clientWidth  | 0;
+    const h   = fieldCanvas.clientHeight | 0;
+    if (w <= 0 || h <= 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cw  = Math.round(w * dpr);
+    const ch  = Math.round(h * dpr);
+    if (fieldCanvas.width  !== cw) fieldCanvas.width  = cw;
+    if (fieldCanvas.height !== ch) fieldCanvas.height = ch;
+    fieldCtx.setTransform(1, 0, 0, 1, 0, 0);
+    fieldCtx.scale(dpr, dpr);
+
+    // Smooth the amplitude (use envSlew → longer tau for visual softness)
+    for (let i = 0; i < 4; i++) {
+      splatSmooth[i] = expSlew(splatSmooth[i] || 0, envSlew[i] || 0, dt, 0.12);
+    }
+
+    // ── Emit new particles ────────────────────────────────────────────────
+    for (let ci = 0; ci < 4; ci++) {
+      const amp  = splatSmooth[ci];
+      if (amp < 0.012) continue;
+
+      const freq   = applied.freqHz[ci];
+      const corner = SPLAT_CORNERS[ci];
+      const speed  = 0.06 + (freq / 1500) * 0.20;  // faster at higher freq
+
+      // 2–20 particles/sec depending on amplitude
+      let emitCount = (2 + amp * 18) * dt;
+
+      while (splatParticles.length < SPLAT_MAX && emitCount > 0) {
+        if (Math.random() > Math.min(emitCount, 1)) break;
+        emitCount -= 1;
+
+        // Direction: toward centre with generous angular spread
+        const toCenter = Math.atan2(0.5 - corner.y, 0.5 - corner.x);
+        const spread   = 1.3 + (1 - amp) * 0.9;
+        const angle    = toCenter + (Math.random() - 0.5) * spread;
+        const spd      = speed * (0.4 + Math.random() * 0.9);
+
+        // Check per-channel effects for particle flavouring
+        const efx = (window.SynthEngine && window.SynthEngine.getChannelEffects)
+          ? window.SynthEngine.getChannelEffects(ci) : {};
+
+        const hasFuzz    = !!(efx.fuzz    || efx.distort);
+        const hasEcho    = !!efx.echo;
+        const hasPhaser  = !!(efx.phaser  || efx.flanger);
+        const hasPitch   = !!efx.pitch;
+
+        // Base particle
+        splatParticles.push({
+          ci,
+          x:     corner.x + (Math.random() - 0.5) * 0.06,
+          y:     corner.y + (Math.random() - 0.5) * 0.06,
+          vx:    Math.cos(angle) * spd,
+          vy:    Math.sin(angle) * spd,
+          r:     (0.032 + amp * 0.058) * Math.min(w, h),   // pixel radius
+          alpha: 0.50 + amp * 0.50,
+          life:  1.0,
+          decay: 0.22 + Math.random() * 0.32,
+          // Effect-driven extras
+          pulsing: hasPhaser,                               // radius oscillates
+          sparky:  hasFuzz,                                 // spawns micro-sparks
+          echoed:  false,
+          hueShift: hasPitch ? (Math.random() - 0.5) * 80 : 0,  // warm/cool tint
+        });
+
+        // Echo effect: spawn a ghost particle slightly behind
+        if (hasEcho && Math.random() < 0.45) {
+          const echoDist = (efx.echo?.delay || 0.3) * 0.08;
+          splatParticles.push({
+            ci,
+            x:     corner.x - Math.cos(angle) * echoDist + (Math.random() - 0.5) * 0.03,
+            y:     corner.y - Math.sin(angle) * echoDist + (Math.random() - 0.5) * 0.03,
+            vx:    Math.cos(angle) * spd * 0.55,
+            vy:    Math.sin(angle) * spd * 0.55,
+            r:     (0.018 + amp * 0.028) * Math.min(w, h),
+            alpha: (0.30 + amp * 0.30) * (efx.echo?.mix || 0.5),
+            life:  1.0,
+            decay: 0.35 + Math.random() * 0.25,
+            pulsing: false, sparky: false, echoed: true, hueShift: 0,
+          });
+        }
+
+        // Fuzz/Distort: micro-spark satellites
+        if (hasFuzz && Math.random() < amp * 0.6) {
+          const sparkAngle = Math.random() * TAU;
+          const sparkSpd   = speed * (0.8 + Math.random() * 1.2);
+          splatParticles.push({
+            ci,
+            x:     corner.x + (Math.random() - 0.5) * 0.04,
+            y:     corner.y + (Math.random() - 0.5) * 0.04,
+            vx:    Math.cos(sparkAngle) * sparkSpd,
+            vy:    Math.sin(sparkAngle) * sparkSpd,
+            r:     (0.006 + Math.random() * 0.010) * Math.min(w, h),
+            alpha: 0.7 + Math.random() * 0.3,
+            life:  1.0,
+            decay: 0.9 + Math.random() * 1.5,
+            pulsing: false, sparky: false, echoed: false, hueShift: 0,
+          });
+        }
+      }
+    }
+
+    // ── Update particles ──────────────────────────────────────────────────
+    const _t = performance.now() * 0.001;
+    for (let i = splatParticles.length - 1; i >= 0; i--) {
+      const p = splatParticles[i];
+      p.x    += p.vx * dt;
+      p.y    += p.vy * dt;
+      p.vx   *= (1 - 1.1 * dt);   // gentle drag
+      p.vy   *= (1 - 1.1 * dt);
+      p.life -= p.decay * dt;
+      if (p.pulsing) p.r *= (1 + 0.015 * Math.sin(_t * TAU * 1.4));  // phaser pulse
+      if (p.life <= 0) { splatParticles.splice(i, 1); }
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────
+    // Partial fade for persistent motion trails (instead of hard clear)
+    fieldCtx.fillStyle = 'rgba(8, 8, 14, 0.20)';
+    fieldCtx.fillRect(0, 0, w, h);
+
+    // Screen-blend so colours add together where they overlap
+    fieldCtx.save();
+    fieldCtx.globalCompositeOperation = 'screen';
+
+    for (const p of splatParticles) {
+      const px    = p.x * w;
+      const py    = p.y * h;
+      const alpha = p.alpha * Math.max(0, p.life);
+      const r     = Math.max(1.5, p.r * Math.max(0, p.life));
+      const cc    = SPLAT_RGB[p.ci];
+
+      // Optional hue shift (for pitch effect visual — warm/cool tint)
+      let cr = cc[0], cg = cc[1], cb = cc[2];
+      if (p.hueShift !== 0) {
+        const hs = p.hueShift;
+        cr = clamp(Math.round(cr + hs * 0.5), 0, 255);
+        cb = clamp(Math.round(cb - hs * 0.5), 0, 255);
+      }
+
+      const grad = fieldCtx.createRadialGradient(px, py, 0, px, py, r);
+      grad.addColorStop(0,    `rgba(${cr},${cg},${cb},${Math.min(0.9, alpha).toFixed(2)})`);
+      grad.addColorStop(0.30, `rgba(${cr},${cg},${cb},${(alpha * 0.50).toFixed(2)})`);
+      grad.addColorStop(0.65, `rgba(${cr},${cg},${cb},${(alpha * 0.14).toFixed(2)})`);
+      grad.addColorStop(1,    `rgba(${cr},${cg},${cb},0)`);
+
+      fieldCtx.beginPath();
+      fieldCtx.arc(px, py, r, 0, TAU);
+      fieldCtx.fillStyle = grad;
+      fieldCtx.fill();
+    }
+
+    // Corner ambient glow — shows channel presence even with no particles
+    for (let ci = 0; ci < 4; ci++) {
+      const amp  = splatSmooth[ci];
+      if (amp < 0.02) continue;
+      const corner = SPLAT_CORNERS[ci];
+      const cc     = SPLAT_RGB[ci];
+      const cx     = corner.x * w;
+      const cy     = corner.y * h;
+      const gr     = (0.06 + amp * 0.10) * Math.min(w, h);
+      const grd    = fieldCtx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+      grd.addColorStop(0, `rgba(${cc[0]},${cc[1]},${cc[2]},${(amp * 0.50).toFixed(2)})`);
+      grd.addColorStop(1, `rgba(${cc[0]},${cc[1]},${cc[2]},0)`);
+      fieldCtx.beginPath();
+      fieldCtx.arc(cx, cy, gr, 0, TAU);
+      fieldCtx.fillStyle = grd;
+      fieldCtx.fill();
+    }
+
+    fieldCtx.restore();
+  }
+  // End splat system ────────────────────────────────────────────────────────
+
   // -------- Field rendering (v6 source) --------
 let GRID_N = 101;
 let FIELD_OFF_W = 220;
@@ -1358,7 +1557,10 @@ function renderFieldRich(dt) {
       const mag = clamp(Math.abs(z), 0, 1); const bright = baseLift + (1 - baseLift) * (0.18 + 0.82 * mag);
       r *= bright; g *= bright; b *= bright;
       const node = Math.exp(-Math.pow((Math.abs(z) / Math.max(1e-6, nodeWidth)), 2));
-      r = lerp(r, 1.0, node * nodeStrength); g = lerp(g, 1.0, node * nodeStrength); b = lerp(b, 1.0, node * nodeStrength);
+      // At nodes: desaturate toward luminance (colour drains away) rather than flashing white
+      const nodeLum = 0.2126*r + 0.7152*g + 0.0722*b;
+      const nodeDesat = node * nodeStrength;
+      r = lerp(r, nodeLum, nodeDesat); g = lerp(g, nodeLum, nodeDesat); b = lerp(b, nodeLum, nodeDesat);
       {
         const l = 0.2126*r + 0.7152*g + 0.0722*b;
         r = l + (r - l) * VIS_SAT; g = l + (g - l) * VIS_SAT; b = l + (b - l) * VIS_SAT;
@@ -2106,6 +2308,7 @@ function compileExpr(expr) {
     pollGamepad(nowSec); applyScriptToCursor(nowSec, dt); updateApplied(dt, nowSec);
     for (let i = 0; i < 4; i++) { envSlew[i] = expSlew(envSlew[i] || 0, applied.ampEff[i] || 0, dt, 0.04); }
     if (APP_MODE === "biome" && window.BiomeEngine) window.BiomeEngine.step(dt);
+    if (APP_MODE === "synth" && window.SynthEngine) window.SynthEngine.step(dt, nowSec, applied);
     if (audio.node && audio.ctx && now - audio.lastSend > 16) { audio.lastSend = now; audio.node.port.postMessage(buildAudioParamMessage()); }
     if (dac.enabled && dac.node && dac.ctx && now - dac.lastSend > 16) { dac.lastSend = now; dac.node.port.postMessage(buildDacParamMessage()); }
     // Per-slot DAC outputs — primary (CH1→L, CH2→R) and secondary (CH3→L, CH4→R)
@@ -2138,7 +2341,18 @@ function compileExpr(expr) {
 
   function renderTick() {
     const now = performance.now(); const dt = clamp((now - lastRenderT) / 1000, 0, 0.05); lastRenderT = now;
-    if (APP_MODE === "biome") { if (window.BiomeEngine) { window.BiomeEngine.render(dt); drawSpectrum(); } } else { drawScope(); strobePhase = (strobePhase + TAU * FIELD_DRIFT_HZ * dt) % TAU; computeField(true, dt); renderFieldRich(dt); }
+    if (APP_MODE === "biome") {
+      if (window.BiomeEngine) { window.BiomeEngine.render(dt); drawSpectrum(); }
+    } else if (APP_MODE === "synth") {
+      // Full oscilloscope trace display on scope canvas
+      if (window.SynthEngine) window.SynthEngine.renderSlitScan(scopeCanvas);
+      // Touch canvas is hidden in synth mode — skip wave field computation
+    } else {
+      drawScope();
+      strobePhase = (strobePhase + TAU * FIELD_DRIFT_HZ * dt) % TAU;
+      computeField(true, dt);
+      renderFieldRich(dt);
+    }
     requestAnimationFrame(renderTick);
   }
 
@@ -2172,9 +2386,12 @@ function compileExpr(expr) {
     if (modeBtnEl && !modeBtnEl.dataset.bound) {
       modeBtnEl.dataset.bound = "1";
       modeBtnEl.addEventListener("click", () => {
-        const next = (APP_MODE === "biome") ? "control" : "biome";
-        // When entering Biome mode, stop any motion scripts and release the pad.
-        if (next === "biome") {
+        // Cycle: control → biome → synth → control
+        const modeOrder = ["control", "biome", "synth"];
+        const nextIdx = (modeOrder.indexOf(APP_MODE) + 1) % modeOrder.length;
+        const next = modeOrder[nextIdx];
+        // When leaving control mode, stop motion scripts and release the pad
+        if (APP_MODE === "control") {
           motion.active = false;
           try { releaseCursor(); } catch {}
         }
@@ -2202,9 +2419,16 @@ function compileExpr(expr) {
 // --- Find the end of your main.js and ensure this logic is present ---
 
   function setAppMode(mode){
-    APP_MODE = (mode === "biome") ? "biome" : "control";
+    const validModes = ["control", "biome", "synth"];
+    APP_MODE = validModes.includes(mode) ? mode : "control";
     document.body.setAttribute("data-mode", APP_MODE);
-    if ($("modeBtn")) $("modeBtn").textContent = (APP_MODE === "biome") ? "Mode: Biome" : "Mode: Control";
+    const modeLabels = { control: "Mode: Control", biome: "Mode: Biome", synth: "Mode: Synth" };
+    if ($("modeBtn")) $("modeBtn").textContent = modeLabels[APP_MODE] || "Mode: Control";
+
+    // Stop Biome engine unless entering biome mode
+    if (window.BiomeEngine) window.BiomeEngine.setEnabled(false);
+    // Stop Synth engine unless entering synth mode
+    if (window.SynthEngine) window.SynthEngine.setEnabled(false);
 
     if (APP_MODE === "biome") {
       refreshScriptSelectForMode();
@@ -2222,9 +2446,21 @@ function compileExpr(expr) {
         const intensity = parseFloat($("caretakerIntensity")?.value || "100") / 100;
         window.BiomeEngine.setCaretaker(selId, _caretakerActive, intensity);
       }
-    } else {
+    } else if (APP_MODE === "synth") {
+      // Build Synth UI on first entry
+      if (window.SynthEngine) {
+        const synthContent = $("synthContent");
+        if (synthContent && !synthContent.dataset.built) {
+          synthContent.dataset.built = "1";
+          window.SynthEngine.loadFromStorage();
+          window.SynthEngine.buildSynthUI(synthContent);
+        }
+        window.SynthEngine.setEnabled(true);
+      }
       refreshScriptSelectForMode();
-      if (window.BiomeEngine) window.BiomeEngine.setEnabled(false);
+    } else {
+      // control mode
+      refreshScriptSelectForMode();
     }
     // Phase visibility depends on mode — update whenever mode changes
     try { updatePhaseUIState(); } catch {}

@@ -253,6 +253,129 @@ dialog{
 .dlg-value{ margin-top: 8px; color: rgba(255,255,255,0.85); }
 .dlg-actions{ margin-top: 12px; display:flex; gap:10px; justify-content:flex-end; }
 
+/* ── Guide overlay + dialog box ─────────────────────────────────────────── */
+/* Full-screen backdrop */
+#guideOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.70);
+  z-index: 10000;
+  display: none;          /* shown via JS: style.display = 'flex' */
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+/* The actual dialog box */
+#guideDialog {
+  background: #1a1a1a;
+  color: var(--text);
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.80);
+  width: min(720px, 96vw);
+  max-height: 88vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.09);
+}
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.09);
+  flex-shrink: 0;
+}
+.guide-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.88);
+}
+.guide-close-x {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.40);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.guide-close-x:hover { color: rgba(255,255,255,0.85); }
+
+/* Tab bar */
+.guide-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.09);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.guide-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.40);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 10px 14px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+.guide-tab:hover { color: rgba(255,255,255,0.70); }
+.guide-tab.active {
+  color: #7af;
+  border-bottom-color: #7af;
+}
+
+/* Panel content */
+.guide-panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 12px;
+  color: rgba(255,255,255,0.72);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.guide-panel.active { display: block; }
+.guide-panel h4 {
+  margin: 14px 0 5px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255,255,255,0.50);
+}
+.guide-panel h4:first-child { margin-top: 0; }
+.guide-panel p  { margin: 4px 0 8px; }
+.guide-panel ol,
+.guide-panel ul { margin: 4px 0 10px; padding-left: 20px; }
+.guide-panel li { margin-bottom: 5px; }
+.guide-panel strong { color: rgba(255,255,255,0.88); }
+.guide-panel em    { color: rgba(255,255,255,0.55); font-style: italic; }
+.guide-intro {
+  color: rgba(255,255,255,0.50);
+  font-style: italic;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+#guideDialog .dlg-actions {
+  padding: 10px 18px 14px;
+  border-top: 1px solid rgba(255,255,255,0.09);
+  margin: 0;
+  flex-shrink: 0;
+}
+
 #debugOverlay{
   position:fixed; left:12px; bottom:12px; z-index:9999;
   background:rgba(0,0,0,0.55); color:#fff; padding:8px 10px;
@@ -901,3 +1024,400 @@ body.dac-slot-active [phaseCycleControl] {
   padding-top: 0;
   margin-top: 0;
 }
+
+/* ══════════════════════════════════════════════════════════
+   SYNTH MODE
+   ══════════════════════════════════════════════════════════ */
+
+/* Body tint in Synth mode */
+body[data-mode="synth"] { background: #0e0e16; }
+
+/* Show synth panel only in synth mode */
+body:not([data-mode="synth"]) #synthPanel { display: none !important; }
+
+/* Hide biome-only and control-only panels in synth mode */
+body[data-mode="synth"] #biomePanel,
+body[data-mode="synth"] #touchPanel,
+body[data-mode="synth"] #vizPanel,
+body[data-mode="synth"] #motionPanel { display: none !important; }
+
+/* Scope panel label changes in synth mode (still visible, shows slit-scan) */
+body[data-mode="synth"] .scopeFrame { border: 1px solid rgba(100,80,255,0.2); }
+
+/* Synth panel: full-height scrollable container in right panel column */
+#synthPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#synthContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+.synth-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.synth-tool-btn {
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+}
+
+/* ── Channel lanes ───────────────────────────────────────── */
+.synth-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.synth-lane {
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Lane header */
+.synth-lane-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.synth-lane-ch {
+  font-weight: 800;
+  font-size: 13px;
+  min-width: 32px;
+}
+.synth-add-btn,
+.synth-fx-btn {
+  font-size: 11px !important;
+  padding: 4px 9px !important;
+}
+.synth-fx-btn.active {
+  background: rgba(100,80,255,0.3) !important;
+  border-color: rgba(100,80,255,0.7) !important;
+  color: #c4b0ff !important;
+}
+
+/* ── Modifier blocks row ─────────────────────────────────── */
+.synth-lane-mods {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px;
+  min-height: 46px;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px dashed rgba(255,255,255,0.08);
+  transition: border-color 0.15s;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.synth-lane-mods.drag-over {
+  border-color: rgba(100,80,255,0.55);
+  background: rgba(100,80,255,0.07);
+}
+
+.synth-drop-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.2);
+  white-space: nowrap;
+  pointer-events: none;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+/* Individual modifier block */
+.synth-mod-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid var(--mod-color, #888);
+  border-radius: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition: background 0.12s, transform 0.1s;
+  position: relative;
+}
+.synth-mod-block:hover { background: rgba(255,255,255,0.10); transform: translateY(-1px); }
+.synth-mod-block.dragging { opacity: 0.45; transform: scale(0.97); }
+
+/* Enabled dot */
+.synth-mod-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.synth-mod-dot.active { background: var(--mod-color, #08f); box-shadow: 0 0 5px var(--mod-color, #08f); }
+
+.synth-mod-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--mod-color, #ccc);
+  white-space: nowrap;
+}
+
+.synth-mod-remove {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.synth-mod-remove:hover { color: rgba(255,100,100,0.9); }
+
+/* ── Effects rack ────────────────────────────────────────── */
+.synth-fx-rack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 4px 2px 2px;
+}
+
+.synth-fx-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--fx-color, #888);
+  border-radius: 7px;
+  padding: 4px 7px;
+  cursor: pointer;
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  transition: background 0.12s;
+}
+.synth-fx-chip:hover { background: rgba(255,255,255,0.09); }
+.synth-fx-chip.active {
+  background: rgba(255,255,255,0.10);
+  color: var(--fx-color, #ccc);
+  box-shadow: 0 0 6px rgba(0,0,0,0.3);
+}
+.synth-fx-toggle {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 5px;
+}
+.synth-fx-chip.active .synth-fx-toggle {
+  background: var(--fx-color, #08f);
+  border-color: transparent;
+  color: #000;
+  font-weight: 700;
+}
+
+/* ── Modifier palette (floating) ─────────────────────────── */
+.synth-palette {
+  position: fixed;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #1a1a26;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 10px;
+  z-index: 9000;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+  max-width: 300px;
+}
+.synth-palette-chip {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid currentColor;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.12s, transform 0.1s;
+}
+.synth-palette-chip:hover { background: rgba(255,255,255,0.12); transform: translateY(-1px); }
+
+/* ── Parameter popup (floating) ──────────────────────────── */
+.synth-param-popup {
+  position: fixed;
+  background: #1c1c2a;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  z-index: 9100;
+  box-shadow: 0 10px 35px rgba(0,0,0,0.75);
+  min-width: 220px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.synth-param-title {
+  font-weight: 800;
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 2px;
+}
+.synth-param-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.synth-param-row label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.6);
+}
+.synth-param-val {
+  font-weight: 700;
+  color: #0af;
+}
+.synth-param-slider {
+  width: 100%;
+  accent-color: #7060ff;
+}
+.synth-param-close {
+  align-self: flex-end;
+  font-size: 12px !important;
+  padding: 5px 12px !important;
+  margin-top: 2px;
+}
+
+/* ── Arrangements dialog (floating) ─────────────────────── */
+.synth-arr-dlg {
+  position: fixed;
+  background: #1a1a28;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 14px;
+  padding: 0;
+  z-index: 9200;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.8);
+  min-width: 300px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.synth-arr-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  letter-spacing: 0.03em;
+}
+.synth-arr-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.synth-arr-close:hover { color: rgba(255,255,255,0.85); }
+.synth-arr-list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.synth-arr-empty {
+  padding: 18px 16px;
+  color: rgba(255,255,255,0.35);
+  font-size: 12px;
+  text-align: center;
+}
+.synth-arr-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin: 1px 6px;
+  transition: background 0.12s;
+}
+.synth-arr-row:hover { background: rgba(255,255,255,0.06); }
+.synth-arr-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.80);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.synth-arr-act-btn {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.75);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.synth-arr-act-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.synth-arr-load  { border-color: rgba(80,200,255,0.35); color: #5cf; }
+.synth-arr-load:hover  { background: rgba(80,200,255,0.14); }
+.synth-arr-del   { border-color: rgba(255,80,80,0.30); color: rgba(255,130,130,0.85); }
+.synth-arr-del:hover   { background: rgba(255,80,80,0.14); }
+.synth-arr-save  { border-color: rgba(100,255,160,0.35); color: #6fc; }
+.synth-arr-save:hover  { background: rgba(100,255,160,0.14); }
+.synth-arr-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.02);
+}
+.synth-arr-input {
+  flex: 1;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 7px;
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.synth-arr-input::placeholder { color: rgba(255,255,255,0.30); }
+.synth-arr-input:focus { border-color: rgba(120,100,255,0.6); }
