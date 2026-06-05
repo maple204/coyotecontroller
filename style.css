@@ -7,9 +7,9 @@
   --muted:#bdbdbd;
 
   --ch1: rgba(0,170,255,0.95);
-  --ch2: rgba(255,80,80,0.95);
-  --ch3: rgba(80,255,140,0.95);
-  --ch4: rgba(255,210,80,0.95);
+  --ch2: rgba(255,210,80,0.95);
+  --ch3: rgba(255,80,80,0.95);
+  --ch4: rgba(80,255,140,0.95);
 
   --shadow-dark:#000;
   --shadow-light:#2b2b2b;
@@ -1118,6 +1118,16 @@ body[data-mode="synth"] .scopeFrame { border: 1px solid rgba(100,80,255,0.2); }
   border-color: rgba(100,80,255,0.7) !important;
   color: #c4b0ff !important;
 }
+.synth-wave-select {
+  font-size: 11px;
+  padding: 3px 6px;
+  margin-left: auto;
+  background: #1e1e1e;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
 
 /* ── Modifier blocks row ─────────────────────────────────── */
 .synth-lane-mods {
@@ -1238,6 +1248,13 @@ body[data-mode="synth"] .scopeFrame { border: 1px solid rgba(100,80,255,0.2); }
   border-color: transparent;
   color: #000;
   font-weight: 700;
+}
+.synth-fx-chip.dragging {
+  opacity: 0.4;
+}
+.synth-fx-chip.fx-drop-target {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255,255,255,0.4);
 }
 
 /* ── Modifier palette (floating) ─────────────────────────── */

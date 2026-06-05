@@ -61,6 +61,7 @@
   };
 
   // 10-way predation cycle
+  // 13-way predation cycle — new species woven into the food web
   const PREY_MAP = {
     bacteria:     "archaea",      // Jellyfish eat Radiolarians
     archaea:      "flagellate",   // Radiolarians eat Siphonophores
@@ -68,10 +69,13 @@
     lattice:      "mycelium",     // Polychaetes eat Nudibranchs
     mycelium:     "scintillator", // Nudibranchs eat Glass Squids
     scintillator: "ctenophore",   // Glass Squids eat Ctenophores
-    ctenophore:   "mantis",       // Ctenophores eat Mantis Shrimp
+    ctenophore:   "bristleworm",  // Ctenophores eat Bristleworms
+    bristleworm:  "mantis",       // Bristleworms eat Mantis Shrimp
     mantis:       "pyrosome",     // Mantis Shrimp eat Pyrosomes
-    pyrosome:     "seaangel",     // Pyrosomes eat Sea Angels
-    seaangel:     "bacteria"      // Sea Angels eat Jellyfish
+    pyrosome:     "salpchain",    // Pyrosomes eat Salp Chains
+    salpchain:    "seaangel",     // Salp Chains eat Sea Angels
+    seaangel:     "leviathan",    // Sea Angels eat Leviathans (parasitic)
+    leviathan:    "bacteria"      // Leviathans eat Jellyfish
   };
 
   const CARETAKER_DIETS = {
@@ -623,6 +627,171 @@
         }
         return ns;
       }
+    },
+
+    // ── LEVIATHAN (Deep-Sea Anglerfish) ───────────────────────────────────────
+    // Massive, slow, menacing. Bioluminescent lure dangles ahead.
+    // Huge dark body with faint internal glow. Ambush predator.
+    leviathan: {
+      name: "Leviathan", speed: 0.00002, turn: 0.006, wander: 0.008, drag: 0.985,
+      coreRadius: 0.028, prefs: ["iron", "carbon", "sulfur"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        // Massive dark body
+        const bodyPulse = 0.9 + 0.1 * Math.sin(lt * 0.3 + a.seed);
+        const bodyR = a.r * bodyPulse;
+        // Deep dark outer glow
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bodyR * 1.8, rgb: [20, 15, 35], a: a.currAlpha * 0.25, s: 0.95 });
+        // Main body — dark with faint bioluminescence
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bodyR, rgb: a.currRgb, a: a.currAlpha * 0.5, s: 0.18 });
+        // Internal glow (stomach)
+        const glowPulse = 0.5 + 0.5 * Math.sin(lt * 0.8 + a.seed * 2.1);
+        ns.push({ x: a.x, y: a.y, z: a.z, r: bodyR * 0.4, rgb: [255, 60, 30], a: a.currAlpha * 0.3 * glowPulse, s: 0.06 });
+
+        if (a.state === "alive") {
+          // Gaping jaw
+          const [jx, jy] = rotate2(bodyR * 0.7, 0, a.heading);
+          ns.push({ x: a.x + jx, y: a.y + jy, z: a.z, r: bodyR * 0.55, rgb: [15, 5, 20], a: a.currAlpha * 0.7, s: 0.08 });
+          // Rows of teeth (6 points around jaw)
+          for (let i = 0; i < 6; i++) {
+            const ang = a.heading + ((i - 2.5) / 2.5) * 0.8;
+            const tr = bodyR * (0.6 + 0.15 * Math.sin(lt * 1.5 + i * 1.8));
+            const [tx, ty] = rotate2(tr, 0, ang);
+            ns.push({ x: a.x + jx + tx * 0.3, y: a.y + jy + ty * 0.3, z: a.z,
+                      r: a.r * 0.06, rgb: [255, 255, 240], a: a.currAlpha * 0.8, s: 0.04 });
+          }
+          // Bioluminescent lure — dangles ahead on a stalk
+          const lureLen = bodyR * (2.5 + 0.5 * Math.sin(lt * 0.4 + a.seed));
+          const lureSwing = Math.sin(lt * 0.6 + a.seed * 1.3) * 0.3;
+          const [lx, ly] = rotate2(lureLen, 0, a.heading + lureSwing);
+          // Lure stalk
+          for (let j = 1; j <= 4; j++) {
+            const u = j / 4;
+            const [sx, sy] = rotate2(lureLen * u, Math.sin(lt * 1.2 + j * 0.8) * bodyR * 0.15, a.heading + lureSwing * u);
+            ns.push({ x: a.x + sx, y: a.y + sy, z: a.z, r: a.r * 0.04, rgb: a.currRgb, a: a.currAlpha * 0.3, s: 0.15 });
+          }
+          // Lure bulb — bright pulsing light
+          const lureBright = 0.6 + 0.4 * Math.sin(lt * 2.5 + a.seed);
+          ns.push({ x: a.x + lx, y: a.y + ly, z: a.z, r: a.r * 0.25, rgb: [180, 255, 200], a: a.currAlpha * lureBright, s: 0.04 });
+          ns.push({ x: a.x + lx, y: a.y + ly, z: a.z, r: a.r * 0.45, rgb: [100, 255, 160], a: a.currAlpha * lureBright * 0.3, s: 0.7 });
+          // Small dorsal fin
+          const [fx, fy] = rotate2(-bodyR * 0.3, bodyR * 0.5, a.heading);
+          ns.push({ x: a.x + fx, y: a.y + fy, z: a.z, r: a.r * 0.2, rgb: a.currRgb, a: a.currAlpha * 0.35, s: 0.2 });
+        }
+        return ns;
+      }
+    },
+
+    // ── BRISTLEWORM (Fireworm) ────────────────────────────────────────────────
+    // Fast, segmented, bristling with glowing spines. Darting predator.
+    bristleworm: {
+      name: "Bristleworm", speed: 0.00018, turn: 0.035, wander: 0.025, drag: 0.92,
+      coreRadius: 0.012, prefs: ["iron", "sulfur"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        const segs = 10;
+        const segLen = a.r * 0.8;
+
+        for (let i = 0; i < segs; i++) {
+          const u = i / (segs - 1);
+          // Sinusoidal body undulation
+          const wave = Math.sin(lt * 4.5 - i * 0.9 + a.seed) * a.r * (0.15 + u * 0.1);
+          const [sx, sy] = rotate2(-segLen * i, wave, a.heading);
+          const segR = a.r * (0.32 - u * 0.18);
+          // Body segment
+          ns.push({ x: a.x + sx, y: a.y + sy, z: a.z, r: segR,
+                    rgb: a.currRgb, a: a.currAlpha * (1 - u * 0.3), s: 0.12 });
+
+          // Bristle spines — 2 per segment, glowing
+          if (a.state === "alive" && i > 0 && i < segs - 1) {
+            const bristlePulse = 0.5 + 0.5 * Math.sin(lt * 6 + i * 1.4 + a.seed);
+            for (let side = -1; side <= 1; side += 2) {
+              const bAng = a.heading + Math.PI / 2 * side + Math.sin(lt * 3 + i + a.seed) * 0.3;
+              const bLen = segR * (1.2 + 0.4 * bristlePulse);
+              const [bx, by] = rotate2(bLen, 0, bAng);
+              ns.push({ x: a.x + sx + bx, y: a.y + sy + by, z: a.z,
+                        r: a.r * 0.04 * bristlePulse, rgb: [255, 180, 60],
+                        a: a.currAlpha * 0.6 * bristlePulse, s: 0.06 });
+            }
+          }
+        }
+        // Head — bright with antennae
+        const [hx, hy] = rotate2(a.r * 0.4, 0, a.heading);
+        ns.push({ x: a.x + hx, y: a.y + hy, z: a.z, r: a.r * 0.28, rgb: [255, 220, 160], a: a.currAlpha * 0.85, s: 0.07 });
+        // Two antennae
+        for (let side = -1; side <= 1; side += 2) {
+          const antAng = a.heading + side * 0.4 + Math.sin(lt * 2 + a.seed) * 0.15;
+          const antLen = a.r * 1.2;
+          for (let j = 1; j <= 3; j++) {
+            const au = j / 3;
+            const [ax, ay] = rotate2(a.r * 0.4 + antLen * au, 0, antAng);
+            ns.push({ x: a.x + ax, y: a.y + ay, z: a.z, r: a.r * (0.05 - au * 0.02),
+                      rgb: [255, 200, 100], a: a.currAlpha * (0.7 - au * 0.3), s: 0.1 });
+          }
+        }
+        return ns;
+      }
+    },
+
+    // ── SALP CHAIN (Colonial Tunicates) ───────────────────────────────────────
+    // Chain of linked translucent barrel-shaped bodies. Moves as one organism.
+    // Ethereal, ghostly, bioluminescent chain drifting through the water.
+    salpchain: {
+      name: "Salp Chain", speed: 0.00006, turn: 0.010, wander: 0.012, drag: 0.975,
+      coreRadius: 0.016, prefs: ["water", "sugar", "carbon"], reproduction: "mitosis",
+      makeNodes(a, t) {
+        const ns = [];
+        const lt = t * a.timeScale;
+        const chainLen = 8;
+        const spacing = a.r * 0.65;
+
+        // Jet propulsion pulse — the chain contracts and extends
+        const jetPulse = 0.8 + 0.2 * Math.sin(lt * TAU * 0.4 + a.seed);
+
+        for (let i = 0; i < chainLen; i++) {
+          const u = i / (chainLen - 1);
+          // Chain undulates like a sine wave
+          const wave = Math.sin(lt * 1.8 - i * 0.7 + a.seed) * a.r * 0.3;
+          const dist = spacing * i * jetPulse;
+          const [sx, sy] = rotate2(-dist, wave, a.heading);
+
+          // Each salp is a translucent barrel
+          const barrelR = a.r * (0.35 - u * 0.08) * (0.85 + 0.15 * Math.sin(lt * 2.5 + i * 1.2));
+          // Outer barrel (translucent)
+          ns.push({ x: a.x + sx, y: a.y + sy, z: a.z, r: barrelR,
+                    rgb: a.currRgb, a: a.currAlpha * (0.3 - u * 0.1), s: 0.55 });
+          // Inner bioluminescent organ
+          const innerGlow = 0.4 + 0.6 * Math.sin(lt * 1.5 + i * 0.9 + a.seed * 3);
+          ns.push({ x: a.x + sx, y: a.y + sy, z: a.z, r: barrelR * 0.4,
+                    rgb: [200, 255, 230], a: a.currAlpha * 0.5 * innerGlow, s: 0.06 });
+
+          // Connecting thread to next salp
+          if (i < chainLen - 1 && a.state === "alive") {
+            const nextWave = Math.sin(lt * 1.8 - (i + 1) * 0.7 + a.seed) * a.r * 0.3;
+            const nextDist = spacing * (i + 1) * jetPulse;
+            const [nx, ny] = rotate2(-nextDist, nextWave, a.heading);
+            const mx = (sx + nx) * 0.5, my = (sy + ny) * 0.5;
+            ns.push({ x: a.x + mx, y: a.y + my, z: a.z, r: a.r * 0.03,
+                      rgb: a.currRgb, a: a.currAlpha * 0.2, s: 0.2 });
+          }
+        }
+
+        // Lead salp — slightly brighter, with sensory cilia
+        const [lx, ly] = rotate2(a.r * 0.3, 0, a.heading);
+        ns.push({ x: a.x + lx, y: a.y + ly, z: a.z, r: a.r * 0.2,
+                  rgb: [220, 255, 245], a: a.currAlpha * 0.6, s: 0.08 });
+        // Cilia
+        for (let c = 0; c < 4; c++) {
+          const cAng = a.heading + ((c - 1.5) / 1.5) * 0.6;
+          const cLen = a.r * (0.5 + 0.2 * Math.sin(lt * 5 + c * 2.1));
+          const [cx, cy] = rotate2(a.r * 0.3 + cLen, 0, cAng);
+          ns.push({ x: a.x + cx, y: a.y + cy, z: a.z, r: a.r * 0.025,
+                    rgb: [180, 255, 220], a: a.currAlpha * 0.35, s: 0.12 });
+        }
+        return ns;
+      }
     }
   };
 
@@ -701,8 +870,109 @@ class NutrientBlob {
 
   
   // ---------------------------------------------------------------------------
+  // BIOME MODIFIER ENGINE — synth-style amplitude and pitch modifiers that
+  // layer on top of each species' gate pattern. Each modifier has its own
+  // phase accumulator tracked per-parasite. Returns amplitude multiplier
+  // (0..1) for amplitude mods, or frequency multiplier for pitch mods.
+  // ---------------------------------------------------------------------------
+  const PITCH_MODS = new Set(['vibrato', 'pitchpulse']);
+
+  function computeBiomeMod(mod, t, dt) {
+    const p = mod.params;
+    if (mod._phase == null) mod._phase = Math.random(); // randomize start phase
+
+    switch (mod.id) {
+      case 'pulse': {
+        const rate = Math.max(0.01, p.rate || 2);
+        mod._phase = (mod._phase + rate * dt) % 1;
+        const duty = clamp(p.duty || 0.3, 0.01, 0.99);
+        const ph = mod._phase;
+        let env;
+        if      (ph < duty * 0.1)              env = ph / (duty * 0.1);
+        else if (ph < duty)                    env = 1;
+        else if (ph < duty + (1 - duty) * 0.25) env = 1 - (ph - duty) / ((1 - duty) * 0.25);
+        else                                   env = 0;
+        return clamp((p.depth || 0.9) * env, 0, 1);
+      }
+      case 'breathe': {
+        const rate = Math.max(0.01, p.rate || 0.3);
+        const v = 0.5 + 0.5 * Math.sin(t * rate * TAU - Math.PI / 2);
+        return clamp((p.depth || 0.8) * v, 0, 1);
+      }
+      case 'burst': {
+        const rate  = Math.max(0.01, p.rate || 2.5);
+        const count = Math.max(1, Math.round(p.count || 3));
+        const gap   = clamp(p.gap || 0.4, 0, 0.9);
+        mod._phase = (mod._phase + rate * dt) % 1;
+        const beatSize = 1.0 / count;
+        const beatLocal = (mod._phase % beatSize) / beatSize;
+        if (beatLocal > (1 - gap)) return 0;
+        const noteLocal = beatLocal / (1 - gap);
+        const env = noteLocal < 0.15 ? noteLocal / 0.15
+                  : noteLocal < 0.6  ? 1
+                  : 1 - (noteLocal - 0.6) / 0.4;
+        return clamp((p.depth || 1) * Math.max(0, env), 0, 1);
+      }
+      case 'stutter': {
+        const rate = Math.max(0.01, p.rate || 8);
+        const duty = clamp(p.duty || 0.5, 0.01, 0.99);
+        mod._phase = (mod._phase + rate * dt) % 1;
+        const on = mod._phase < duty ? 1 : 0;
+        return clamp((p.depth || 0.7) * on, 0, 1);
+      }
+      case 'swell': {
+        const rate = Math.max(0.005, p.rate || 0.15);
+        const ph = (t * rate) % 1;
+        const v = ph < 0.6 ? Math.pow(ph / 0.6, 0.7) : Math.pow(1 - (ph - 0.6) / 0.4, 0.45);
+        return clamp((p.depth || 0.9) * Math.max(0, v), 0, 1);
+      }
+      case 'groove': {
+        const rate   = Math.max(0.01, p.rate || 1.5);
+        const swing  = clamp(p.swing || 0.6, 0, 1);
+        mod._phase = (mod._phase + rate * dt) % 1;
+        const beat = Math.min(3, Math.floor(mod._phase * 4));
+        const bLocal = (mod._phase * 4) % 1;
+        const strengths = [1.0, swing * 0.35, swing * 0.65, swing * 0.25];
+        const env = bLocal < 0.12 ? bLocal / 0.12 : Math.exp(-(bLocal - 0.12) * 5);
+        return clamp((p.depth || 0.85) * strengths[beat] * Math.max(0, env), 0, 1);
+      }
+      case 'ramp': {
+        const rate = Math.max(0.01, p.rate || 0.5);
+        const ph = (t * rate) % 1;
+        const v = p.up ? ph : 1 - ph;
+        return clamp((p.depth || 1) * v, 0, 1);
+      }
+      case 'chaos': {
+        const rate = Math.max(0.01, p.rate || 1);
+        const prev = mod._phase;
+        mod._phase = (mod._phase + rate * dt) % 1;
+        if (!mod._state) mod._state = { a: 0.5, b: Math.random() };
+        const st = mod._state;
+        if (mod._phase < prev) { st.a = st.b; st.b = Math.random(); }
+        const u = mod._phase;
+        const v = st.a + (st.b - st.a) * (u * u * (3 - 2 * u));
+        return clamp((p.depth || 0.8) * v + (1 - (p.depth || 0.8)) * 0.05, 0, 1);
+      }
+      case 'vibrato': {
+        if (mod._phase == null) mod._phase = 0;
+        mod._phase += (p.rate || 4) * dt * TAU;
+        const lfo = Math.sin(mod._phase);
+        return Math.pow(2, ((p.depth || 3) * lfo) / 12);
+      }
+      case 'pitchpulse': {
+        if (mod._phase == null) mod._phase = 0;
+        mod._phase = (mod._phase + (p.rate || 2) * dt) % 1;
+        const on = mod._phase < clamp(p.duty || 0.5, 0.01, 0.99);
+        return Math.pow(2, (on ? (p.jump || 7) : 0) / 12);
+      }
+      default: return 1;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // FAMILY SOUND LIBRARIES — each species has a radically different sensation
   // identity. Gate types: wave, heartbeat, stroke, thrust, swell, buzz.
+  // Modifiers: synth-style amp/pitch shapers driven by creature state.
   // ---------------------------------------------------------------------------
   const SOUND_LIB = {
     bacteria: { // Jellyfish — long breathing ocean swells
@@ -713,7 +983,27 @@ class NutrientBlob {
       glide: 0.03,
       vibratoHz: [0.3, 0.7], vibratoAmt: [0.02, 0.04],
       gate: "wave", talkiness: 0.15, grit: 0.005,
-      echo: { taps: [1.2, 2.4], gains: [0.22, 0.10] }
+      waveType: 0, // sine — smooth rolling swells
+      // JELLYFISH FX: Deep ocean phaser that slowly undulates like tides.
+      // When well-fed, the phaser deepens into thick lush sweeps.
+      // Near other creatures, echo creates vast cavernous space.
+      // Approaching the edge adds a stressed flanger shimmer.
+      baseFx: { phaser: { rate: 0.08, depth: 0.25 }, echo: { delay: 0.8, feedback: 0.3, mix: 0.15 } },
+      fxRules: {
+        energy:  { phaser_depth: [0.15, 0.7], phaser_rate: [0.06, 0.2], echo_feedback: [0.2, 0.55] },
+        speed:   { flanger_depth: [0, 0.35], flanger_rate: [0.05, 0.25] },
+        social:  { echo_mix: [0.1, 0.45], echo_delay: [0.4, 1.2] },
+        edge:    { flanger_feedback: [0, 0.5], fuzz_mix: [0, 0.15] },
+        age:     { phaser_rate: [0.06, 0.15] }
+      },
+      echo: { taps: [1.2, 2.4], gains: [0.22, 0.10] },
+      // MODS: Slow breathe at rest, swell emerges when well-fed
+      mods: [
+        { id: 'breathe', params: { rate: 0.12, depth: 0.3 },
+          rules: { energy: { depth: [0.2, 0.7], rate: [0.08, 0.25] }, speed: { depth: [0.2, 0.5] } } },
+        { id: 'swell', params: { rate: 0.06, depth: 0 },
+          rules: { energy: { depth: [0, 0.6], rate: [0.04, 0.12] }, social: { depth: [0, 0.4] } } }
+      ]
     },
     archaea: { // Radiolarians — heartbeat double-pulse (lub-dub)
       identity: "heartbeat",
@@ -723,7 +1013,30 @@ class NutrientBlob {
       glide: 0.08,
       vibratoHz: [0.8, 2.0], vibratoAmt: [0.015, 0.03],
       gate: "heartbeat", talkiness: 0.3, grit: 0.02,
-      echo: { taps: [0.12, 0.42], gains: [0.38, 0.18] }
+      waveType: 1, // triangle — sharper percussive pulse
+      // RADIOLARIAN FX: Heartbeat distortion — lub-dub crunch.
+      // Hunting intensifies into fuzz-distort stacked aggression.
+      // Well-fed creatures get a warm saturated tone.
+      // Social contact adds echo like a second heartbeat.
+      baseFx: { distort: { drive: 2, mix: 0.2 } },
+      fxRules: {
+        speed:   { distort_drive: [1.5, 8], distort_mix: [0.15, 0.55] },
+        hunting: { fuzz_drive: [1, 6], fuzz_mix: [0, 0.55], distort_drive: [2, 12] },
+        energy:  { fuzz_mix: [0, 0.35], fuzz_drive: [1, 3] },
+        social:  { echo_delay: [0.1, 0.35], echo_mix: [0, 0.4], echo_feedback: [0, 0.45] },
+        health:  { distort_mix: [0.1, 0.4] },
+        age:     { fuzz_mix: [0, 0.2] }
+      },
+      echo: { taps: [0.12, 0.42], gains: [0.38, 0.18] },
+      // MODS: Pulse doubles like a heartbeat, burst when hunting
+      mods: [
+        { id: 'pulse', params: { rate: 1.2, depth: 0.4, duty: 0.35 },
+          rules: { speed: { rate: [0.8, 2.5], depth: [0.3, 0.8] }, energy: { duty: [0.25, 0.5] } } },
+        { id: 'burst', params: { rate: 0, depth: 0, count: 2, gap: 0.3 },
+          rules: { hunting: { rate: [0, 3.5], depth: [0, 0.9], count: [2, 4] } } },
+        { id: 'vibrato', params: { rate: 0, depth: 0 },
+          rules: { social: { rate: [0, 3], depth: [0, 2] } } }
+      ]
     },
     flagellate: { // Siphonophores — smooth silky stroking
       identity: "silk stroke",
@@ -733,7 +1046,30 @@ class NutrientBlob {
       glide: 0.06,
       vibratoHz: [3, 6], vibratoAmt: [0.02, 0.05],
       gate: "stroke", talkiness: 0.4, grit: 0.01,
-      echo: { taps: [0.15, 0.30], gains: [0.20, 0.10] }
+      waveType: 0, // sine — silky smooth
+      // SIPHONOPHORE FX: Silk ribbon — layered flanger + phaser creates
+      // shimmering iridescent texture like light through a colony.
+      // Social encounters create harmonic interference. Hunting adds edge.
+      // Well-fed = lush thick texture, starving = thin and bare.
+      baseFx: { flanger: { rate: 0.08, depth: 0.2, feedback: 0.25 }, phaser: { rate: 0.12, depth: 0.15 } },
+      fxRules: {
+        speed:   { flanger_rate: [0.05, 0.4], phaser_rate: [0.08, 0.5] },
+        energy:  { flanger_depth: [0.1, 0.45], phaser_depth: [0.08, 0.5], flanger_feedback: [0.15, 0.55] },
+        social:  { phaser_depth: [0.1, 0.65], echo_mix: [0, 0.3], echo_delay: [0.15, 0.4] },
+        hunting: { distort_mix: [0, 0.25], distort_drive: [1, 3] },
+        stomach: { flanger_feedback: [0.15, 0.5] },
+        age:     { phaser_rate: [0.08, 0.25] }
+      },
+      echo: { taps: [0.15, 0.30], gains: [0.20, 0.10] },
+      // MODS: Silky ramp strokes, chaos emerges when overfed, vibrato on social
+      mods: [
+        { id: 'ramp', params: { rate: 0.4, depth: 0.35, up: 1 },
+          rules: { speed: { rate: [0.25, 0.8], depth: [0.2, 0.6] }, energy: { depth: [0.2, 0.5] } } },
+        { id: 'chaos', params: { rate: 0, depth: 0 },
+          rules: { stomach: { rate: [0, 1.5], depth: [0, 0.4] }, energy: { depth: [0, 0.35] } } },
+        { id: 'vibrato', params: { rate: 2, depth: 0 },
+          rules: { social: { depth: [0, 4], rate: [2, 6] } } }
+      ]
     },
     lattice: { // Polychaetes — deep rhythmic thrusting power
       identity: "deep thrust",
@@ -743,7 +1079,30 @@ class NutrientBlob {
       glide: 0.04,
       vibratoHz: [0.1, 0.4], vibratoAmt: [0.008, 0.015],
       gate: "thrust", talkiness: 0.08, grit: 0.005,
-      echo: { taps: [0.65, 1.30], gains: [0.40, 0.20] }
+      waveType: 2, // square — hard punchy thrust
+      // POLYCHAETE FX: Industrial power — stacked distort into fuzz like a
+      // doom metal rig. Slow and crushing. Energy = heavier saturation.
+      // Hunting triggers a thick flanger undertow. Edge stress = raw fuzz.
+      // Echo creates the sensation of pounding echoing through a cavern.
+      baseFx: { distort: { drive: 3.5, mix: 0.35 }, fuzz: { drive: 2, mix: 0.15 } },
+      fxRules: {
+        energy:  { distort_drive: [2.5, 10], fuzz_mix: [0.1, 0.55], fuzz_drive: [1.5, 5] },
+        speed:   { fuzz_drive: [1.5, 5], distort_mix: [0.25, 0.55] },
+        hunting: { flanger_depth: [0, 0.4], flanger_feedback: [0, 0.55], flanger_rate: [0.05, 0.15] },
+        edge:    { fuzz_mix: [0.1, 0.6], fuzz_drive: [2, 7] },
+        stomach: { echo_mix: [0, 0.3], echo_delay: [0.4, 0.9], echo_feedback: [0, 0.4] },
+        age:     { distort_drive: [3, 6] }
+      },
+      echo: { taps: [0.65, 1.30], gains: [0.40, 0.20] },
+      // MODS: Groove thrust pattern, stutter when hunting, pitch drops with energy
+      mods: [
+        { id: 'groove', params: { rate: 0.8, depth: 0.5, swing: 0.7 },
+          rules: { speed: { rate: [0.5, 1.8], depth: [0.35, 0.85] }, energy: { swing: [0.5, 0.9] } } },
+        { id: 'stutter', params: { rate: 0, depth: 0, duty: 0.4 },
+          rules: { hunting: { rate: [0, 12], depth: [0, 0.8] }, edge: { rate: [0, 6], depth: [0, 0.5] } } },
+        { id: 'pitchpulse', params: { rate: 0, jump: -5, duty: 0.4 },
+          rules: { energy: { rate: [0, 1.5] }, hunting: { rate: [0, 2], jump: [-12, -3] } } }
+      ]
     },
     mycelium: { // Nudibranchs — liquid flowing swell
       identity: "liquid eel",
@@ -753,7 +1112,33 @@ class NutrientBlob {
       glide: 0.05,
       vibratoHz: [2, 4], vibratoAmt: [0.04, 0.08],
       gate: "swell", talkiness: 0.25, grit: 0.06,
-      echo: { taps: [0.25, 0.50], gains: [0.28, 0.14] }
+      waveType: 0, // sine — liquid organic flow
+      // NUDIBRANCH FX: Psychedelic liquid — deep phaser swirl that shifts
+      // with movement like oil on water. Overfed = warm fuzz saturation
+      // like an overdriven tube amp. Social = flanged unison shimmer.
+      // Diet variety adds echo complexity — the more diverse, the richer.
+      baseFx: { phaser: { rate: 0.2, depth: 0.3 }, fuzz: { drive: 1, mix: 0 } },
+      fxRules: {
+        energy:  { phaser_depth: [0.15, 0.7], fuzz_mix: [0, 0.5], fuzz_drive: [1, 4] },
+        speed:   { phaser_rate: [0.12, 0.7], flanger_depth: [0, 0.2] },
+        social:  { flanger_depth: [0, 0.35], flanger_rate: [0.1, 0.4], flanger_feedback: [0, 0.4] },
+        stomach: { echo_mix: [0, 0.35], echo_delay: [0.2, 0.6], echo_feedback: [0, 0.5], phaser_depth: [0.2, 0.6] },
+        hunting: { fuzz_mix: [0, 0.3], distort_mix: [0, 0.2], distort_drive: [1, 3] },
+        edge:    { phaser_rate: [0.15, 0.5] },
+        age:     { phaser_depth: [0.2, 0.5], fuzz_mix: [0, 0.15] }
+      },
+      echo: { taps: [0.25, 0.50], gains: [0.28, 0.14] },
+      // MODS: Liquid swell breathing, chaos when overfed, vibrato on social
+      mods: [
+        { id: 'swell', params: { rate: 0.15, depth: 0.4 },
+          rules: { energy: { depth: [0.25, 0.75], rate: [0.1, 0.3] }, speed: { rate: [0.1, 0.35] } } },
+        { id: 'breathe', params: { rate: 0.2, depth: 0.25 },
+          rules: { stomach: { depth: [0.15, 0.55] }, age: { rate: [0.15, 0.35] } } },
+        { id: 'chaos', params: { rate: 0, depth: 0 },
+          rules: { energy: { rate: [0, 2], depth: [0, 0.5] }, hunting: { rate: [0, 1.5], depth: [0, 0.4] } } },
+        { id: 'vibrato', params: { rate: 0, depth: 0 },
+          rules: { social: { rate: [0, 5], depth: [0, 3] }, hunting: { rate: [0, 3], depth: [0, 2] } } }
+      ]
     },
     scintillator: { // Glass Squids — rapid electric buzz with AM envelope
       identity: "electric buzz",
@@ -763,7 +1148,33 @@ class NutrientBlob {
       glide: 0.85,
       vibratoHz: [12, 20], vibratoAmt: [0.08, 0.18],
       gate: "buzz", talkiness: 0.85, grit: 0.35,
-      echo: { taps: [0.03, 0.07, 0.13], gains: [0.50, 0.28, 0.12] }
+      waveType: 2, // square — electric intensity
+      // GLASS SQUID FX: Electric storm — always aggressive, never clean.
+      // Fuzz + distort stacked = crackling electric texture at rest.
+      // Speed makes it scream. Hunting = maximal chaos with flanger.
+      // Social proximity creates interference patterns (dueling buzzes).
+      // Low health = desperate sputtering distortion.
+      baseFx: { fuzz: { drive: 3, mix: 0.35 }, distort: { drive: 2.5, mix: 0.25 } },
+      fxRules: {
+        speed:   { fuzz_drive: [2.5, 9], distort_mix: [0.2, 0.6], flanger_rate: [0, 0.8] },
+        energy:  { fuzz_mix: [0.2, 0.7], distort_drive: [2, 6] },
+        hunting: { fuzz_drive: [3, 10], flanger_depth: [0, 0.4], flanger_feedback: [0, 0.5] },
+        social:  { phaser_depth: [0, 0.5], phaser_rate: [0.5, 2.0] },
+        health:  { distort_drive: [2, 10], distort_mix: [0.2, 0.6] },
+        edge:    { fuzz_mix: [0.3, 0.7], echo_mix: [0, 0.2] }
+      },
+      echo: { taps: [0.03, 0.07, 0.13], gains: [0.50, 0.28, 0.12] },
+      // MODS: Stutter crackle always active, burst on hunting, chaotic pitch jumps
+      mods: [
+        { id: 'stutter', params: { rate: 6, depth: 0.3, duty: 0.6 },
+          rules: { speed: { rate: [4, 18], depth: [0.2, 0.7] }, energy: { duty: [0.4, 0.8] } } },
+        { id: 'burst', params: { rate: 0, depth: 0, count: 4, gap: 0.2 },
+          rules: { hunting: { rate: [0, 6], depth: [0, 0.9] }, health: { rate: [0, 3], depth: [0, 0.5] } } },
+        { id: 'pitchpulse', params: { rate: 0, jump: 12, duty: 0.3 },
+          rules: { speed: { rate: [0, 4] }, hunting: { rate: [0, 6], jump: [5, 19] } } },
+        { id: 'chaos', params: { rate: 2, depth: 0.2 },
+          rules: { energy: { depth: [0.1, 0.6], rate: [1.5, 5] } } }
+      ]
     },
     ctenophore: { // Ctenophores — expanding concentric ring pulses
       identity: "ripple tide",
@@ -773,7 +1184,31 @@ class NutrientBlob {
       glide: 0.04,
       vibratoHz: [1.5, 3.5], vibratoAmt: [0.025, 0.05],
       gate: "ripple", talkiness: 0.20, grit: 0.008,
-      echo: { taps: [0.35, 0.70], gains: [0.28, 0.12] }
+      waveType: 1, // triangle — sharp ripple edges
+      // CTENOPHORE FX: Prismatic ripples — flanger creates rainbow-like
+      // comb-filter patterns that shift with motion. Energy intensifies
+      // the resonance into ringing metallic tones. Social creates
+      // phaser interference. Echo spreads ripples into space.
+      baseFx: { flanger: { rate: 0.12, depth: 0.25, feedback: 0.35 } },
+      fxRules: {
+        speed:   { flanger_rate: [0.08, 0.5], flanger_depth: [0.15, 0.45] },
+        energy:  { flanger_feedback: [0.25, 0.75], echo_mix: [0, 0.25], echo_feedback: [0, 0.4] },
+        social:  { phaser_depth: [0, 0.45], phaser_rate: [0.2, 0.8] },
+        hunting: { distort_mix: [0, 0.3], distort_drive: [1, 4], flanger_rate: [0.1, 0.7] },
+        stomach: { flanger_feedback: [0.25, 0.6] },
+        edge:    { echo_mix: [0, 0.3], echo_delay: [0.3, 0.7] },
+        age:     { flanger_depth: [0.2, 0.4] }
+      },
+      echo: { taps: [0.35, 0.70], gains: [0.28, 0.12] },
+      // MODS: Pulse creates ripple rings, ramp builds up, vibrato on social
+      mods: [
+        { id: 'pulse', params: { rate: 0.6, depth: 0.35, duty: 0.5 },
+          rules: { speed: { rate: [0.4, 1.5], depth: [0.2, 0.6] }, energy: { duty: [0.35, 0.7] } } },
+        { id: 'ramp', params: { rate: 0.2, depth: 0.2, up: 1 },
+          rules: { energy: { depth: [0.1, 0.5], rate: [0.15, 0.4] }, hunting: { depth: [0, 0.4] } } },
+        { id: 'vibrato', params: { rate: 1.5, depth: 0 },
+          rules: { social: { depth: [0, 3.5], rate: [1, 4] }, stomach: { depth: [0, 1.5] } } }
+      ]
     },
     mantis: { // Mantis Shrimp — quick-quick-STRONG gallop punch
       identity: "gallop punch",
@@ -783,7 +1218,33 @@ class NutrientBlob {
       glide: 0.12,
       vibratoHz: [0.5, 1.5], vibratoAmt: [0.01, 0.025],
       gate: "gallop", talkiness: 0.35, grit: 0.04,
-      echo: { taps: [0.08, 0.24, 0.48], gains: [0.45, 0.22, 0.10] }
+      waveType: 2, // square — hard punching strikes
+      // MANTIS SHRIMP FX: Boxer — clean at rest, EXPLODES on contact.
+      // Hunting = massive distort spike like a punch landing.
+      // Speed stacks fuzz on top for relentless aggression.
+      // Echo creates rapid-fire staccato repeats of the strikes.
+      // Social = competitive buzz, two fighters in the ring.
+      baseFx: { distort: { drive: 1.5, mix: 0.15 } },
+      fxRules: {
+        hunting: { distort_drive: [2, 14], distort_mix: [0.2, 0.7], fuzz_mix: [0, 0.5], fuzz_drive: [1, 7] },
+        speed:   { fuzz_drive: [1, 5], fuzz_mix: [0, 0.4], distort_mix: [0.1, 0.5] },
+        energy:  { echo_mix: [0, 0.3], echo_delay: [0.06, 0.2], echo_feedback: [0, 0.5] },
+        social:  { flanger_depth: [0, 0.35], flanger_rate: [0.3, 1.2], flanger_feedback: [0, 0.4] },
+        health:  { fuzz_mix: [0, 0.35], distort_drive: [1.5, 8] },
+        edge:    { distort_mix: [0.1, 0.45] }
+      },
+      echo: { taps: [0.08, 0.24, 0.48], gains: [0.45, 0.22, 0.10] },
+      // MODS: Burst punches, groove when stalking, pitch jump on strike
+      mods: [
+        { id: 'burst', params: { rate: 1.5, depth: 0.3, count: 3, gap: 0.35 },
+          rules: { hunting: { rate: [1, 4], depth: [0.2, 1.0], count: [2, 5] }, speed: { rate: [1, 3] } } },
+        { id: 'groove', params: { rate: 0, depth: 0, swing: 0.8 },
+          rules: { speed: { rate: [0, 2.2], depth: [0, 0.7] }, energy: { swing: [0.5, 0.95] } } },
+        { id: 'pitchpulse', params: { rate: 0, jump: 7, duty: 0.15 },
+          rules: { hunting: { rate: [0, 3.5], jump: [5, 14] }, speed: { rate: [0, 2] } } },
+        { id: 'stutter', params: { rate: 0, depth: 0, duty: 0.3 },
+          rules: { edge: { rate: [0, 10], depth: [0, 0.6] }, health: { rate: [0, 8], depth: [0, 0.5] } } }
+      ]
     },
     pyrosome: { // Pyrosomes — slow teasing climb that never resolves
       identity: "tease wave",
@@ -793,7 +1254,34 @@ class NutrientBlob {
       glide: 0.025,
       vibratoHz: [0.2, 0.6], vibratoAmt: [0.04, 0.09],
       gate: "tease", talkiness: 0.10, grit: 0.012,
-      echo: { taps: [1.8, 3.6], gains: [0.18, 0.08] }
+      waveType: 0, // sine — gentle teasing
+      // PYROSOME FX: Edging tease — slow phaser that builds toward
+      // something but never resolves. Energy gradually introduces warm
+      // fuzz (the promise of release). Echo creates dreamy repetition.
+      // Hunting adds urgency through flanger acceleration.
+      // Older colonies develop deeper, more complex modulation.
+      baseFx: { phaser: { rate: 0.06, depth: 0.2 }, echo: { delay: 1.0, feedback: 0.2, mix: 0.1 } },
+      fxRules: {
+        energy:  { phaser_depth: [0.12, 0.6], fuzz_mix: [0, 0.4], fuzz_drive: [1, 3.5], echo_feedback: [0.15, 0.5] },
+        stomach: { phaser_rate: [0.04, 0.25], echo_delay: [0.5, 1.4] },
+        speed:   { phaser_rate: [0.05, 0.2], flanger_depth: [0, 0.2] },
+        hunting: { flanger_rate: [0, 0.3], flanger_depth: [0, 0.3], fuzz_mix: [0, 0.25] },
+        social:  { echo_mix: [0.08, 0.35], phaser_depth: [0.15, 0.5] },
+        age:     { phaser_depth: [0.15, 0.5], echo_mix: [0.08, 0.25], fuzz_mix: [0, 0.2] },
+        edge:    { phaser_rate: [0.05, 0.15] }
+      },
+      echo: { taps: [1.8, 3.6], gains: [0.18, 0.08] },
+      // MODS: Slow ramp tease that builds, breathe underneath, swell on social
+      mods: [
+        { id: 'ramp', params: { rate: 0.04, depth: 0.3, up: 1 },
+          rules: { energy: { depth: [0.2, 0.7], rate: [0.03, 0.1] }, age: { depth: [0.2, 0.55] } } },
+        { id: 'breathe', params: { rate: 0.06, depth: 0.2 },
+          rules: { stomach: { depth: [0.1, 0.5], rate: [0.04, 0.12] }, energy: { rate: [0.05, 0.1] } } },
+        { id: 'swell', params: { rate: 0, depth: 0 },
+          rules: { social: { rate: [0, 0.08], depth: [0, 0.55] }, hunting: { rate: [0, 0.06], depth: [0, 0.4] } } },
+        { id: 'vibrato', params: { rate: 0.5, depth: 0 },
+          rules: { energy: { depth: [0, 1.5], rate: [0.3, 1.5] }, age: { depth: [0, 1] } } }
+      ]
     },
     seaangel: { // Sea Angels — delicate paired wing-beat flutter
       identity: "angel flutter",
@@ -803,7 +1291,155 @@ class NutrientBlob {
       glide: 0.07,
       vibratoHz: [3, 6], vibratoAmt: [0.03, 0.065],
       gate: "flutter", talkiness: 0.30, grit: 0.015,
-      echo: { taps: [0.12, 0.24], gains: [0.32, 0.14] }
+      waveType: 1, // triangle — delicate flutter attack
+      // SEA ANGEL FX: Ethereal wings — delicate flanger flutter that
+      // quickens with speed like wingbeats getting faster. Social
+      // encounters bloom into lush phaser harmonics (courtship display).
+      // Hunting adds edge through light distortion. Echo creates
+      // angelic trailing afterimages. Well-fed = thick gorgeous texture.
+      baseFx: { flanger: { rate: 0.25, depth: 0.15, feedback: 0.2 }, echo: { delay: 0.15, feedback: 0.15, mix: 0.08 } },
+      fxRules: {
+        speed:   { flanger_rate: [0.15, 1.2], flanger_depth: [0.1, 0.4], echo_mix: [0.05, 0.2] },
+        social:  { phaser_depth: [0, 0.6], phaser_rate: [0.15, 0.6], echo_mix: [0.05, 0.3], echo_delay: [0.1, 0.3] },
+        energy:  { flanger_feedback: [0.15, 0.5], phaser_depth: [0, 0.3], fuzz_mix: [0, 0.15] },
+        hunting: { distort_mix: [0, 0.25], distort_drive: [1, 3.5], flanger_rate: [0.2, 0.8] },
+        stomach: { flanger_depth: [0.1, 0.3] },
+        health:  { echo_feedback: [0.1, 0.35] },
+        age:     { phaser_depth: [0, 0.25], echo_mix: [0.05, 0.15] }
+      },
+      echo: { taps: [0.12, 0.24], gains: [0.32, 0.14] },
+      // MODS: Flutter pulse like wingbeats, breathe between, vibrato courtship
+      mods: [
+        { id: 'pulse', params: { rate: 2.5, depth: 0.3, duty: 0.2 },
+          rules: { speed: { rate: [1.5, 5], depth: [0.2, 0.6], duty: [0.15, 0.35] } } },
+        { id: 'breathe', params: { rate: 0.3, depth: 0.2 },
+          rules: { energy: { depth: [0.15, 0.5], rate: [0.2, 0.5] }, stomach: { depth: [0.1, 0.4] } } },
+        { id: 'vibrato', params: { rate: 3, depth: 0 },
+          rules: { social: { depth: [0, 4.5], rate: [2, 7] }, hunting: { depth: [0, 2] } } },
+        { id: 'chaos', params: { rate: 0, depth: 0 },
+          rules: { edge: { rate: [0, 2], depth: [0, 0.35] }, health: { rate: [0, 1.5], depth: [0, 0.3] } } }
+      ]
+    },
+
+    // ── LEVIATHAN ─────────────────────────────────────────────────────────────
+    leviathan: {
+      identity: "abyssal drone",
+      regMul: 0.25, minMul: 0.15, maxMul: 0.45,
+      ratios: [1, 1.05, 1.1],
+      hopHz: [0.03, 0.06, 0.12],
+      glide: 0.015,
+      vibratoHz: [0.08, 0.25], vibratoAmt: [0.01, 0.025],
+      gate: "drone", talkiness: 0.05, grit: 0.008,
+      waveType: 1, // triangle — sub-bass rumble with overtones
+      // LEVIATHAN FX: Abyssal horror. Heavy distortion always present like
+      // tectonic plates grinding. Fuzz builds to crushing levels with energy.
+      // Echo creates vast subterranean cavern reverb. Hunting activates
+      // a terrifying flanger undertow. Near the edge = cornered beast fury.
+      baseFx: { distort: { drive: 4, mix: 0.4 }, echo: { delay: 1.2, feedback: 0.35, mix: 0.2 } },
+      fxRules: {
+        energy:  { fuzz_drive: [1, 7], fuzz_mix: [0, 0.6], distort_drive: [3, 12] },
+        speed:   { distort_mix: [0.3, 0.6], echo_delay: [0.6, 1.5] },
+        hunting: { flanger_depth: [0, 0.5], flanger_rate: [0.03, 0.12], flanger_feedback: [0, 0.6],
+                   fuzz_mix: [0, 0.5], distort_drive: [4, 15] },
+        social:  { echo_mix: [0.15, 0.45], echo_feedback: [0.3, 0.6] },
+        edge:    { fuzz_mix: [0, 0.7], fuzz_drive: [2, 9], distort_mix: [0.35, 0.7] },
+        age:     { distort_drive: [3, 8], echo_feedback: [0.25, 0.5] }
+      },
+      echo: { taps: [2.0, 4.0], gains: [0.15, 0.06] },
+      // MODS: Deep slow swell like breathing of something enormous.
+      // Groove emerges when hunting — ominous stalking rhythm.
+      // Pitch drops lower and lower with energy (heavier and heavier).
+      mods: [
+        { id: 'swell', params: { rate: 0.04, depth: 0.5 },
+          rules: { energy: { depth: [0.3, 0.8], rate: [0.03, 0.08] } } },
+        { id: 'groove', params: { rate: 0, depth: 0, swing: 0.9 },
+          rules: { hunting: { rate: [0, 0.8], depth: [0, 0.7] }, speed: { rate: [0, 0.5], depth: [0, 0.4] } } },
+        { id: 'pitchpulse', params: { rate: 0, jump: -12, duty: 0.6 },
+          rules: { energy: { rate: [0, 0.4] }, hunting: { rate: [0, 0.6], jump: [-18, -7] } } },
+        { id: 'breathe', params: { rate: 0.03, depth: 0.2 },
+          rules: { age: { depth: [0.15, 0.45] }, stomach: { rate: [0.02, 0.06] } } }
+      ]
+    },
+
+    // ── BRISTLEWORM ───────────────────────────────────────────────────────────
+    bristleworm: {
+      identity: "fire crackle",
+      regMul: 1.8, minMul: 1.0, maxMul: 3.5,
+      ratios: [1, 1.5, 2, 3],
+      hopHz: [2.0, 5.0, 10.0],
+      glide: 0.15,
+      vibratoHz: [5, 12], vibratoAmt: [0.04, 0.1],
+      gate: "staccato", talkiness: 0.65, grit: 0.2,
+      waveType: 2, // square — aggressive crackling
+      // BRISTLEWORM FX: Firecracker. Rapid staccato crackle with fuzz that
+      // gets wilder the faster it moves. Distort spikes on hunting strikes.
+      // Flanger creates metallic bristle-rattle. Social = chaotic interference.
+      baseFx: { fuzz: { drive: 2.5, mix: 0.3 } },
+      fxRules: {
+        speed:   { fuzz_drive: [2, 8], fuzz_mix: [0.2, 0.65], flanger_rate: [0, 1.5], flanger_depth: [0, 0.35] },
+        hunting: { distort_drive: [1, 10], distort_mix: [0, 0.6], fuzz_drive: [2, 9] },
+        energy:  { fuzz_mix: [0.2, 0.55], echo_mix: [0, 0.2], echo_delay: [0.03, 0.1] },
+        social:  { phaser_depth: [0, 0.5], phaser_rate: [0.5, 3.0], flanger_feedback: [0, 0.5] },
+        health:  { distort_mix: [0, 0.45], fuzz_drive: [2, 6] },
+        edge:    { fuzz_mix: [0.25, 0.6], distort_mix: [0, 0.3] },
+        stomach: { flanger_depth: [0, 0.3], flanger_feedback: [0, 0.4] }
+      },
+      echo: { taps: [0.05, 0.12, 0.25], gains: [0.40, 0.22, 0.10] },
+      // MODS: Stutter crackle that intensifies with speed — like firecrackers.
+      // Burst when hunting — rapid-fire needle strikes. Chaos when overfed.
+      // Pitch jumps wildly when near other parasites.
+      mods: [
+        { id: 'stutter', params: { rate: 5, depth: 0.35, duty: 0.55 },
+          rules: { speed: { rate: [3, 20], depth: [0.25, 0.8], duty: [0.4, 0.7] } } },
+        { id: 'burst', params: { rate: 0, depth: 0, count: 3, gap: 0.25 },
+          rules: { hunting: { rate: [0, 5], depth: [0, 1.0], count: [3, 6] }, health: { rate: [0, 3], depth: [0, 0.5] } } },
+        { id: 'chaos', params: { rate: 0, depth: 0 },
+          rules: { energy: { rate: [0, 3], depth: [0, 0.5] }, stomach: { rate: [0, 2], depth: [0, 0.35] } } },
+        { id: 'pitchpulse', params: { rate: 0, jump: 12, duty: 0.25 },
+          rules: { social: { rate: [0, 5], jump: [7, 19] }, speed: { rate: [0, 3] } } }
+      ]
+    },
+
+    // ── SALP CHAIN ────────────────────────────────────────────────────────────
+    salpchain: {
+      identity: "choir drift",
+      regMul: 0.7, minMul: 0.45, maxMul: 1.3,
+      ratios: [1, 1.2, 1.25, 1.33, 1.5],
+      hopHz: [0.15, 0.35, 0.6],
+      glide: 0.025,
+      vibratoHz: [0.5, 1.5], vibratoAmt: [0.015, 0.035],
+      gate: "choir", talkiness: 0.12, grit: 0.003,
+      waveType: 0, // sine — pure ethereal tone
+      // SALP CHAIN FX: Ethereal choir. Layered phaser + flanger creates
+      // shimmering harmonic cloud. Echo adds cathedral reverb.
+      // Energy thickens the texture into lush warmth. Social creates
+      // synchronized resonance. Hunting breaks the serenity with fuzz.
+      baseFx: { phaser: { rate: 0.1, depth: 0.3 }, flanger: { rate: 0.06, depth: 0.15, feedback: 0.3 },
+                echo: { delay: 0.6, feedback: 0.25, mix: 0.15 } },
+      fxRules: {
+        energy:  { phaser_depth: [0.2, 0.65], flanger_feedback: [0.2, 0.55], echo_feedback: [0.2, 0.5] },
+        speed:   { phaser_rate: [0.08, 0.3], flanger_rate: [0.04, 0.15] },
+        social:  { phaser_depth: [0.25, 0.7], flanger_depth: [0.1, 0.4], echo_mix: [0.1, 0.35] },
+        hunting: { fuzz_mix: [0, 0.25], fuzz_drive: [1, 3], distort_mix: [0, 0.15] },
+        stomach: { echo_delay: [0.4, 1.0], phaser_rate: [0.08, 0.2] },
+        age:     { flanger_depth: [0.1, 0.3], echo_mix: [0.1, 0.25] },
+        edge:    { phaser_rate: [0.08, 0.2], flanger_feedback: [0.2, 0.45] }
+      },
+      echo: { taps: [0.8, 1.6, 3.2], gains: [0.20, 0.10, 0.04] },
+      // MODS: Slow synchronised breathing of the whole colony.
+      // Swell builds like a choir crescendo. Ramp on social — two chains
+      // harmonising. Gentle vibrato that thickens with age (older chains
+      // have more complex harmonic wobble).
+      mods: [
+        { id: 'breathe', params: { rate: 0.1, depth: 0.3 },
+          rules: { energy: { depth: [0.2, 0.6], rate: [0.07, 0.18] }, stomach: { depth: [0.15, 0.5] } } },
+        { id: 'swell', params: { rate: 0.05, depth: 0.25 },
+          rules: { social: { depth: [0.15, 0.65], rate: [0.04, 0.1] }, energy: { depth: [0.15, 0.5] } } },
+        { id: 'ramp', params: { rate: 0, depth: 0, up: 1 },
+          rules: { social: { rate: [0, 0.06], depth: [0, 0.4] }, hunting: { rate: [0, 0.08], depth: [0, 0.3] } } },
+        { id: 'vibrato', params: { rate: 0.8, depth: 0 },
+          rules: { age: { depth: [0, 2.5], rate: [0.6, 2] }, social: { depth: [0, 3], rate: [0.5, 1.5] } } }
+      ]
     }
   };
 
@@ -934,6 +1570,27 @@ class NutrientBlob {
         const r = 2.2 + 3.0 * speedN;
         return ((t * r) % 1.0) < 0.14 ? 1.3 : 0.05;
       }
+
+      // DRONE — continuous ominous sub-bass rumble with slow pressure waves.
+      // Never drops below 0.4 — always present, always pressing.
+      case "drone": {
+        const rate = (0.06 + 0.04 * speedN) * rd;
+        const pressure = 0.65 + 0.35 * Math.sin(t * rate * TAU + seed);
+        const subHarm = 0.85 + 0.15 * Math.sin(t * rate * TAU * 2.03 + seed * 1.7);
+        return clamp(pressure * subHarm * ad, 0.4, 1.0);
+      }
+
+      // CHOIR — slow coordinated breathing of a colony, with harmonic overtones
+      // that create the sensation of multiple voices singing together.
+      case "choir": {
+        const rate = (0.15 + 0.1 * speedN) * rd;
+        const voice1 = 0.5 + 0.5 * Math.sin(t * rate * TAU + seed);
+        const voice2 = 0.5 + 0.5 * Math.sin(t * rate * TAU * 1.5 + seed * 2.3 + 0.8);
+        const voice3 = 0.5 + 0.5 * Math.sin(t * rate * TAU * 0.67 + seed * 3.1 + 1.6);
+        const blend = (voice1 * 0.5 + voice2 * 0.3 + voice3 * 0.2);
+        return clamp(blend * ad, 0.08, 1.0);
+      }
+
       default:
         return 1.0;
     }
@@ -943,7 +1600,7 @@ class NutrientBlob {
     constructor(id) {
       this.id = id; this.x = rand(0.3, 0.7); this.y = rand(0.3, 0.7); this.z = 0;
       this.heading = rand(0, TAU); this.state = "hunting"; this.host = null; this.satiety = 0;
-      this.rgb = [[70, 170, 255], [255, 90, 90], [80, 240, 140], [255, 210, 90]][id % 4];
+      this.rgb = [[70, 170, 255], [255, 210, 90], [255, 90, 90], [80, 240, 140]][id % 4];
 
       // Audio state (monophonic, but expressive)
       this.phase = rand(0, TAU);
@@ -954,6 +1611,9 @@ class NutrientBlob {
       this.echoEnv = []; // {ttl, age, decay, gain}
       this.lastClick = 0;
       this.lastPhrase = { amp: 0, hz: 0, t: 0 };
+      // Modifier state: per-parasite phase accumulators for synth-style mods
+      this._modStates = [];
+      this._lastModSpecies = null; // track host species to reinit mods on switch
       // Forever parasite: never despawn. Opportunistic re-homing.
       this.rehomeCooldown = rand(0.5, 1.5);
       this.commitLeft = 0;
@@ -1133,8 +1793,8 @@ audio(t, dt, baseHz, chMult, world) {
       // 2. DISCONNECT SAFETY
       if (this.state !== "latched" || !this.host || this.host.state !== "alive") {
         this.phase = (this.phase + TAU * fBase * dt) % TAU;
-        this.echoEnv = []; 
-        return { amp: 0, freq: fBase, phase: this.phase };
+        this.echoEnv = [];
+        return { amp: 0, freq: fBase, phase: this.phase, waveType: 0, fx: [] };
       }
 
       // 3. PERSONALITY & TEMPORAL NOISE
@@ -1181,7 +1841,7 @@ audio(t, dt, baseHz, chMult, world) {
       const vib = 1 + Math.sin(localT * TAU * vibHz + (this.host.seed || 0)) * vibAmt;
 
       const freqJitter = (Math.random() - 0.5) * (lib.grit || 0) * speedN * this.noteHz;
-      const freq = clamp((this.noteHz * vib) + freqJitter, 20, 1500);
+      let freq = clamp((this.noteHz * vib) + freqJitter, 20, 1500);
 
       // 7. AMPLITUDE & SPECTRUM FIX
       // Pass per-host ADSR drift so each creature has its own slowly-evolving timing
@@ -1190,13 +1850,225 @@ audio(t, dt, baseHz, chMult, world) {
       let amp = dyn * gate * energy;
       amp = clamp(amp + this._applyEcho(dt), 0, 1.25);
 
+      // 8. SYNTH-STYLE MODIFIERS — layer amplitude gates and pitch shifts
+      // driven dynamically by creature state on top of the species gate pattern.
+      const modResult = this._applyMods(lib, dt, t, speedN, energy, world);
+      amp *= modResult.ampMul;
+      freq = clamp(freq * modResult.freqMul, 20, 1500);
+
       // FIX: Strictly capping visual amplitude at 1.0 for the Chart
       const finalAmp = clamp(amp * clamp(this.host.energy, 0, 2.0), 0, 1.0);
 
       this.phase = (this.phase + TAU * freq * dt) % TAU;
       this.lastPhrase = { amp: finalAmp, hz: freq, t };
 
-      return { amp: finalAmp, freq, phase: this.phase };
+      // ── Dynamic FX: compute per-frame effect state from creature conditions ──
+      const fx = this._computeDynamicFx(lib, speedN, energy, world);
+
+      return { amp: finalAmp, freq, phase: this.phase, waveType: lib.waveType || 0, fx };
+    }
+
+    // Apply synth-style modifiers driven by creature state.
+    // Returns { ampMul, freqMul } to multiply into the main signal.
+    _applyMods(lib, dt, t, speedN, energy, world) {
+      const modDefs = lib.mods;
+      if (!modDefs || modDefs.length === 0) return { ampMul: 1, freqMul: 1 };
+
+      // Reinitialize mod states when host species changes
+      const speciesId = this.host ? this.host.speciesId : null;
+      if (speciesId !== this._lastModSpecies) {
+        this._lastModSpecies = speciesId;
+        this._modStates = modDefs.map(md => ({
+          id: md.id, _phase: Math.random(), _state: null, params: { ...md.params }
+        }));
+      }
+
+      // Build driving signals (same as _computeDynamicFx)
+      const energyN = clamp(energy / 2.0, 0, 1);
+      const maturityN = this.host ? clamp(this.host.maturity || 0, 0, 1) : 0.5;
+      const stomachN = this.host ? clamp((this.host.stomach || []).length / 6, 0, 1) : 0;
+      const healthN = this.host ? clamp(this.host.health || 0, 0, 1) : 1;
+      const ageN = this.host ? clamp((this.host.age || 0) / 120, 0, 1) : 0;
+      let edgeN = 0;
+      if (this.host) {
+        const dc = Math.hypot(this.host.x - 0.5, this.host.y - 0.5);
+        edgeN = clamp((dc - 0.3) / 0.15, 0, 1);
+      }
+      let huntingN = 0;
+      if (this.host && this.host.speciesId && world && world.agents) {
+        const preyId = PREY_MAP[this.host.speciesId];
+        if (preyId) {
+          for (const a of world.agents) {
+            if (a.speciesId === preyId && a.state === "alive") {
+              const d = Math.hypot(a.x - this.host.x, a.y - this.host.y);
+              if (d < 0.12) { huntingN = clamp(1 - d / 0.12, 0, 1); break; }
+            }
+          }
+        }
+      }
+      let socialN = 0;
+      if (world && world.parasites && this.host) {
+        let minD = 999;
+        for (const p of world.parasites) {
+          if (p === this || p.state !== "latched" || !p.host) continue;
+          const d = Math.hypot(p.host.x - this.host.x, p.host.y - this.host.y);
+          if (d < minD) minD = d;
+        }
+        socialN = clamp(1 - (minD / 0.15), 0, 1);
+      }
+      const signals = { speed: speedN, energy: energyN, maturity: maturityN,
+        stomach: stomachN, social: socialN, age: ageN, health: healthN,
+        hunting: huntingN, edge: edgeN };
+
+      let ampMul = 1, freqMul = 1;
+
+      for (let mi = 0; mi < modDefs.length; mi++) {
+        const def = modDefs[mi];
+        const ms = this._modStates[mi];
+        if (!ms) continue;
+
+        // Compute live params by applying rules to base params
+        const liveParams = { ...def.params };
+        if (def.rules) {
+          for (const [signalName, mappings] of Object.entries(def.rules)) {
+            const sig = signals[signalName] || 0;
+            for (const [paramKey, range] of Object.entries(mappings)) {
+              liveParams[paramKey] = (range[0] || 0) + ((range[1] || 0) - (range[0] || 0)) * sig;
+            }
+          }
+        }
+        ms.params = liveParams;
+
+        // Skip if this modifier is effectively inactive
+        const depth = liveParams.depth || 0;
+        const rate = liveParams.rate || 0;
+        if (depth < 0.01 && rate < 0.01) continue;
+
+        const result = computeBiomeMod(ms, t * (this.host?.timeScale || 1), dt);
+
+        if (PITCH_MODS.has(def.id)) {
+          freqMul *= result;
+        } else {
+          // Blend: modifiers scale amplitude between (1-depth) and 1
+          // so depth=0 means no effect, depth=1 means full gating
+          const d = clamp(depth, 0, 1);
+          ampMul *= (1 - d) + d * result;
+        }
+      }
+
+      // Scale by maturity so babies get gentler modulation
+      const matScale = 0.4 + 0.6 * maturityN;
+      ampMul = 1 - (1 - ampMul) * matScale;
+      freqMul = 1 + (freqMul - 1) * matScale;
+
+      return { ampMul: clamp(ampMul, 0, 1), freqMul: clamp(freqMul, 0.25, 4) };
+    }
+
+    // Compute dynamic audio FX based on creature state, environment, and species profile.
+    // Returns an array of {id, params} in the format the DAC worklet expects.
+    //
+    // Driving signals (all 0..1):
+    //   speed    — how fast the host is moving (pursuit/flight)
+    //   energy   — how well-fed (0=starving, 1=gorged)
+    //   maturity — baby→adult lifecycle
+    //   stomach  — diet diversity (how many items eaten recently)
+    //   social   — proximity to other latched parasites
+    //   age      — lifetime progression (young→elder)
+    //   health   — creature vitality
+    //   hunting  — 1 when actively chasing prey, 0 otherwise
+    //   edge     — how close to the biome boundary (0=center, 1=edge)
+    _computeDynamicFx(lib, speedN, energy, world) {
+      if (!lib.baseFx && !lib.fxRules) return [];
+
+      const rules = lib.fxRules || {};
+      const fxParams = {};
+
+      // Copy base FX defaults
+      if (lib.baseFx) {
+        for (const [fxId, params] of Object.entries(lib.baseFx)) {
+          fxParams[fxId] = { ...params };
+        }
+      }
+
+      // ── Build driving signals ──────────────────────────────────────────────
+      const energyN = clamp(energy / 2.0, 0, 1);
+      const maturityN = this.host ? clamp(this.host.maturity || 0, 0, 1) : 0.5;
+      const stomachN = this.host ? clamp((this.host.stomach || []).length / 6, 0, 1) : 0;
+      const healthN = this.host ? clamp(this.host.health || 0, 0, 1) : 1;
+      const ageN = this.host ? clamp((this.host.age || 0) / 120, 0, 1) : 0; // 0..1 over ~2 minutes
+
+      // How close to boundary (creatures near edge are stressed)
+      let edgeN = 0;
+      if (this.host) {
+        const dc = Math.hypot(this.host.x - 0.5, this.host.y - 0.5);
+        edgeN = clamp((dc - 0.3) / 0.15, 0, 1);
+      }
+
+      // Hunting: is the host actively pursuing prey?
+      let huntingN = 0;
+      if (this.host && this.host.speciesId) {
+        const preyId = PREY_MAP[this.host.speciesId];
+        if (preyId && world && world.agents) {
+          for (const a of world.agents) {
+            if (a.speciesId === preyId && a.state === "alive") {
+              const d = Math.hypot(a.x - this.host.x, a.y - this.host.y);
+              if (d < 0.12) { huntingN = clamp(1 - d / 0.12, 0, 1); break; }
+            }
+          }
+        }
+      }
+
+      // Social: proximity to nearest other latched parasite
+      let socialN = 0;
+      if (world && world.parasites && this.host) {
+        let minD = 999;
+        for (const p of world.parasites) {
+          if (p === this || p.state !== "latched" || !p.host) continue;
+          const d = Math.hypot(p.host.x - this.host.x, p.host.y - this.host.y);
+          if (d < minD) minD = d;
+        }
+        socialN = clamp(1 - (minD / 0.15), 0, 1);
+      }
+
+      const signals = { speed: speedN, energy: energyN, maturity: maturityN,
+        stomach: stomachN, social: socialN, age: ageN, health: healthN,
+        hunting: huntingN, edge: edgeN };
+
+      // ── Apply modulation rules ─────────────────────────────────────────────
+      for (const [signalName, mappings] of Object.entries(rules)) {
+        const signal = signals[signalName] || 0;
+        for (const [paramKey, range] of Object.entries(mappings)) {
+          const sep = paramKey.indexOf('_');
+          if (sep < 0) continue;
+          const fxId = paramKey.substring(0, sep);
+          const param = paramKey.substring(sep + 1);
+          const lo = range[0] || 0, hi = range[1] || 0;
+          const val = lo + (hi - lo) * signal;
+          if (!fxParams[fxId]) fxParams[fxId] = {};
+          fxParams[fxId][param] = val;
+        }
+      }
+
+      // Scale by maturity (babies get gentler FX) and health (wounded = rawer)
+      const matScale = 0.3 + 0.7 * maturityN;
+      const healthBoost = 1 + (1 - healthN) * 0.3; // low health → slightly harsher
+
+      const result = [];
+      for (const [fxId, params] of Object.entries(fxParams)) {
+        const mix = params.mix || 0;
+        const depth = params.depth || 0;
+        const drive = params.drive || 0;
+        const fb = params.feedback || 0;
+        if (mix < 0.02 && depth < 0.02 && drive < 1.01 && fb < 0.02) continue;
+
+        const scaled = { ...params };
+        if (scaled.mix != null)   scaled.mix   = scaled.mix * matScale * healthBoost;
+        if (scaled.depth != null) scaled.depth = scaled.depth * matScale;
+        if (scaled.drive != null) scaled.drive = 1 + (scaled.drive - 1) * matScale * healthBoost;
+
+        result.push({ id: fxId, params: scaled });
+      }
+      return result;
     }
   }
 
@@ -1239,6 +2111,9 @@ class Agent {
         mantis:       [255, 205, 100], // Mantis Shrimp   — warm golden-orange
         pyrosome:     [162, 255, 182], // Pyrosome        — bioluminescent pale green
         seaangel:     [215, 185, 255], // Sea Angel       — pale lavender
+        leviathan:    [ 80,  40,  60], // Leviathan       — deep dark crimson
+        bristleworm:  [255, 145,  55], // Bristleworm     — fiery orange
+        salpchain:    [170, 240, 220], // Salp Chain      — ghostly aquamarine
       };
       this.baseRgb = colors[sid] || [255, 255, 255];
       this.currRgb = [...this.baseRgb]; this.currAlpha = 0; this.r = 0; this.stomach = [];
@@ -1380,10 +2255,13 @@ class World {
       this.parasites = [new Parasite(0), new Parasite(1), new Parasite(2), new Parasite(3)];
       this.t = 0; 
       this.enabled = false;
-      this.audioOut = { amp: [0, 0, 0, 0], freq: [200, 200, 200, 200], phase: [0, 0, 0, 0] };
-      this.off = document.createElement("canvas"); 
+      this.audioOut = { amp: [0, 0, 0, 0], freq: [200, 200, 200, 200], phase: [0, 0, 0, 0], waveTypes: [0, 0, 0, 0], fx: [[], [], [], []] };
+      this.off = document.createElement("canvas");
       this.offCtx = this.off.getContext("2d");
-      this.off.width = this.off.height = 400;
+      // On Pi/Electron: 256px off-canvas cuts fill-pixel work by ~60% vs 400px,
+      // reducing main-thread block time and audio crunch.
+      const _biomeIsElectron = !!(window.electronAPI?.isElectron || /Electron/.test(navigator.userAgent));
+      this.off.width = this.off.height = _biomeIsElectron ? 256 : 400;
       this.caretaker = { id: "gardener", enabled: true, influence: 1.0, t: 0 };
     }
 
@@ -1449,9 +2327,11 @@ class World {
       const pD = this.getParams();
       this.parasites.forEach((p, i) => {
         const mod = p.audio(this.t, safeDt, pD.baseHz, pD.chMult, this);
-        this.audioOut.amp[i] = mod.amp; 
-        this.audioOut.freq[i] = mod.freq; 
+        this.audioOut.amp[i] = mod.amp;
+        this.audioOut.freq[i] = mod.freq;
         this.audioOut.phase[i] = mod.phase;
+        this.audioOut.waveTypes[i] = mod.waveType || 0;
+        this.audioOut.fx[i] = mod.fx || [];
       });
     }
 

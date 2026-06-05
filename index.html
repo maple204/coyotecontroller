@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Coyote Controller</title>
+  <title>Piyote Controller</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
@@ -241,10 +241,18 @@
 
       <!-- Primary slot settings (CH1 → L, CH2 → R) -->
       <div id="primaryDacSettings" class="dac-slot-settings" style="display:none">
-        <div class="dac-slot-title">Primary &mdash; CH1 / CH2</div>
+        <div class="dac-slot-title">PRIMARY &mdash; CH1 / CH2</div>
         <div class="dac-row">
-          <label class="dac-label" for="primaryDacWaveform">Waveform</label>
-          <select id="primaryDacWaveform" class="dac-select">
+          <label class="dac-label">CH1 Wave</label>
+          <select id="dacWaveCH1" class="dac-select">
+            <option value="0">Sine — smooth</option>
+            <option value="1">Triangle — sharper</option>
+            <option value="2">Square — intense</option>
+          </select>
+        </div>
+        <div class="dac-row">
+          <label class="dac-label">CH2 Wave</label>
+          <select id="dacWaveCH2" class="dac-select">
             <option value="0">Sine — smooth</option>
             <option value="1">Triangle — sharper</option>
             <option value="2">Square — intense</option>
@@ -261,10 +269,18 @@
 
       <!-- Secondary slot settings (CH3 → L, CH4 → R) -->
       <div id="secondaryDacSettings" class="dac-slot-settings" style="display:none">
-        <div class="dac-slot-title">Secondary &mdash; CH3 / CH4</div>
+        <div class="dac-slot-title">SECONDARY &mdash; CH3 / CH4</div>
         <div class="dac-row">
-          <label class="dac-label" for="secondaryDacWaveform">Waveform</label>
-          <select id="secondaryDacWaveform" class="dac-select">
+          <label class="dac-label">CH3 Wave</label>
+          <select id="dacWaveCH3" class="dac-select">
+            <option value="0">Sine — smooth</option>
+            <option value="1">Triangle — sharper</option>
+            <option value="2">Square — intense</option>
+          </select>
+        </div>
+        <div class="dac-row">
+          <label class="dac-label">CH4 Wave</label>
+          <select id="dacWaveCH4" class="dac-select">
             <option value="0">Sine — smooth</option>
             <option value="1">Triangle — sharper</option>
             <option value="2">Square — intense</option>

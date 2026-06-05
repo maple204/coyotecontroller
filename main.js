@@ -896,11 +896,11 @@ function cycleRouteValue(v, options){
   // -------- Channel colors --------
   const chColors = [
     { r: 0, g: 170, b: 255 },
+    { r: 255, g: 210, b: 80 },
     { r: 255, g: 80, b: 80 },
     { r: 80, g: 255, b: 140 },
-    { r: 255, g: 210, b: 80 },
   ];
-  const chStroke = ["rgba(0,170,255,0.90)", "rgba(255,80,80,0.90)", "rgba(80,255,140,0.90)", "rgba(255,210,80,0.90)"];
+  const chStroke = ["rgba(0,170,255,0.90)", "rgba(255,210,80,0.90)", "rgba(255,80,80,0.90)", "rgba(80,255,140,0.90)"];
 
   // -------- Modifier math --------
   const cornerVecs = [
@@ -1182,7 +1182,7 @@ function cycleRouteValue(v, options){
     const baseHz = applied.baseHz;
     const cycles = cyclesForHz(baseHz);
     const T = cycles / baseHz;
-    const N = 800;
+    const N = _SCOPE_N;
     const dt = T / (N - 1);
 
     for (let ch = 0; ch < 4; ch++) {
@@ -1223,7 +1223,7 @@ function cycleRouteValue(v, options){
     const fLo = 20, fHi = 1500;
     const logLo = Math.log(fLo), logHi = Math.log(fHi);
     const getX = (f) => 10 + ((Math.log(clamp(f, fLo, fHi)) - logLo) / (logHi - logLo)) * (w - 20);
-    const chColors = ["rgba(0,170,255,0.7)", "rgba(255,80,80,0.7)", "rgba(80,255,140,0.7)", "rgba(255,210,80,0.7)"];
+    const chColors = ["rgba(0,170,255,0.7)", "rgba(255,210,80,0.7)", "rgba(255,80,80,0.7)", "rgba(80,255,140,0.7)"];
 
     for (let i = 0; i < 4; i++) {
       const amp = applied.ampReq[i];
@@ -1274,9 +1274,9 @@ function cycleRouteValue(v, options){
   ];
   const SPLAT_RGB = [
     [0,   170, 255],   // CH1 blue
-    [255, 80,  80 ],   // CH2 red
-    [80,  255, 140],   // CH3 green
-    [255, 210, 80 ],   // CH4 yellow
+    [255, 210, 80 ],   // CH2 yellow
+    [255, 80,  80 ],   // CH3 red
+    [80,  255, 140],   // CH4 green
   ];
 
   function updateAndRenderSplats(dt) {
@@ -1455,26 +1455,32 @@ function cycleRouteValue(v, options){
   // End splat system ────────────────────────────────────────────────────────
 
   // -------- Field rendering (v6 source) --------
+// On Pi / Electron: render the field at lower internal resolution and upscale
+// smoothly — cuts CPU work by ~75% with minimal visual difference at 1080p.
+const _IS_ELECTRON = !!(window.electronAPI?.isElectron || /Electron/.test(navigator.userAgent));
 let GRID_N = 101;
 let FIELD_OFF_W = 220;
 let FIELD_OFF_H = 220;
-let FIELD_QUALITY = 0.65; 
-let fieldImg = null; 
-let fieldImgData = null; 
+let FIELD_QUALITY = _IS_ELECTRON ? 0.10 : 0.65;
+let fieldImg = null;
+let fieldImgData = null;
 let fieldFrameMsEMA = 16;
 let fieldZ = new Float32Array(GRID_N * GRID_N);
 let fieldU = new Float32Array(GRID_N * GRID_N);
 
 function ensureFieldBuffers(viewW, viewH) {
   const dpr = window.devicePixelRatio || 1;
-  const targetGrid = clamp(Math.round(Math.min(viewW, viewH) * dpr * FIELD_QUALITY), 180, 420);
+  // On Pi/Electron use a lower clamp floor — the upscale smoothing compensates visually
+  const gridMin = _IS_ELECTRON ? 36 : 180;
+  const dimMin  = _IS_ELECTRON ? 48 : 240;
+  const targetGrid = clamp(Math.round(Math.min(viewW, viewH) * dpr * FIELD_QUALITY), gridMin, 420);
   if (targetGrid !== GRID_N) {
     GRID_N = targetGrid;
     fieldZ = new Float32Array(GRID_N * GRID_N);
     fieldU = new Float32Array(GRID_N * GRID_N);
   }
-  const targetW = clamp(Math.round(viewW * dpr * FIELD_QUALITY), 240, 900);
-  const targetH = clamp(Math.round(viewH * dpr * FIELD_QUALITY), 240, 900);
+  const targetW = clamp(Math.round(viewW * dpr * FIELD_QUALITY), dimMin, 900);
+  const targetH = clamp(Math.round(viewH * dpr * FIELD_QUALITY), dimMin, 900);
   if (targetW !== FIELD_OFF_W || targetH !== FIELD_OFF_H) {
     FIELD_OFF_W = targetW; FIELD_OFF_H = targetH;
     offField.width = FIELD_OFF_W; offField.height = FIELD_OFF_H;
@@ -1483,14 +1489,47 @@ function ensureFieldBuffers(viewW, viewH) {
   }
 }
 let uMaxSmooth = 1e-6;
-const FIELD_DRIFT_HZ = 0.0625; 
+const FIELD_DRIFT_HZ = 0.0625;
 let strobePhase = 0;
+// 30fps cap for field computation on Pi — audio/scope still run at rAF rate
+let _fieldLastT = 0;
+const _FIELD_FRAME_MS = _IS_ELECTRON ? (1000 / 30) : 0; // 0 = uncapped (Mac)
+// 20fps cap for biome render on Pi (radial-gradient heavy — biggest audio-crunch culprit)
+let _biomeLastT = 0;
+const _BIOME_FRAME_MS = _IS_ELECTRON ? (1000 / 20) : 0;
+// 30fps cap for synth/splat render on Pi
+let _synthLastT = 0;
+const _SYNTH_FRAME_MS = _IS_ELECTRON ? (1000 / 30) : 0;
+// 30fps cap for scope; fewer sin-sample points on Pi (150 vs 800 per channel)
+let _scopeLastT = 0;
+const _SCOPE_FRAME_MS = _IS_ELECTRON ? (1000 / 30) : 0;
+const _SCOPE_N        = _IS_ELECTRON ? 150 : 800;
 const VIS_BRIGHT = 0.05/255; const VIS_CONTRAST = 1.75; const VIS_SAT = 1.65;
 
 const offField = document.createElement("canvas");
 offField.width = FIELD_OFF_W; offField.height = FIELD_OFF_H;
 const offFieldCtx = offField.getContext("2d", { alpha: false });
 offFieldCtx.imageSmoothingEnabled = true;
+
+// Per-pixel corner-weight cache — computed once on resize, reused every frame.
+// Eliminates 4× Math.hypot per pixel per frame from renderFieldRich.
+let _cwCache = null, _cwCacheW = 0, _cwCacheH = 0;
+function ensureCornerWeights(W, H) {
+  if (_cwCache && _cwCacheW === W && _cwCacheH === H) return;
+  _cwCacheW = W; _cwCacheH = H;
+  _cwCache = new Float32Array(W * H * 4); // [wTL, wTR, wBL, wBR] per pixel
+  for (let y = 0; y < H; y++) {
+    const uy = y / Math.max(1, H - 1);
+    for (let x = 0; x < W; x++) {
+      const ux = x / Math.max(1, W - 1);
+      const base = (y * W + x) * 4;
+      _cwCache[base]   = 1 / (0.08 + Math.hypot(ux,     uy    ));
+      _cwCache[base+1] = 1 / (0.08 + Math.hypot(ux - 1, uy    ));
+      _cwCache[base+2] = 1 / (0.08 + Math.hypot(ux,     uy - 1));
+      _cwCache[base+3] = 1 / (0.08 + Math.hypot(ux - 1, uy - 1));
+    }
+  }
+}
 
 function sampleBilinear(arr, x, y) {
   const fx = clamp(x, 0, 1) * (GRID_N - 1);
@@ -1538,29 +1577,35 @@ function renderFieldRich(dt) {
   if (fieldCanvas.height !== ch) fieldCanvas.height = ch;
   fieldCtx.setTransform(1, 0, 0, 1, 0, 0); fieldCtx.scale(dpr, dpr); ensureFieldBuffers(w, h);
   const img = fieldImg; const data = fieldImgData;
-  const colors01 = [ [0/255, 170/255, 255/255], [255/255, 80/255, 80/255], [80/255, 255/255, 140/255], [255/255, 210/255, 80/255] ];
+  const colors01 = [ [0/255, 170/255, 255/255], [255/255, 210/255, 80/255], [255/255, 80/255, 80/255], [80/255, 255/255, 140/255] ];
   const nodeWidth = 0.050; const nodeStrength = 0.78; const baseLift = 0.05;
 
+  ensureCornerWeights(FIELD_OFF_W, FIELD_OFF_H);
+  const ampEff = applied.ampEff;
   for (let y = 0; y < FIELD_OFF_H; y++) {
     const uy = y / (FIELD_OFF_H - 1);
     for (let x = 0; x < FIELD_OFF_W; x++) {
       const ux = x / (FIELD_OFF_W - 1);
       const z = sampleBilinear(fieldZ, ux, uy);
-      const wTL = 1 / (0.08 + Math.hypot(ux - 0, uy - 0)); const wTR = 1 / (0.08 + Math.hypot(ux - 1, uy - 0));
-      const wBL = 1 / (0.08 + Math.hypot(ux - 0, uy - 1)); const wBR = 1 / (0.08 + Math.hypot(ux - 1, uy - 1));
-      const a = applied.ampEff;
-      let c1 = Math.abs(wTL * a[0]); let c2 = Math.abs(wTR * a[1]); let c3 = Math.abs(wBL * a[2]); let c4 = Math.abs(wBR * a[3]);
+      // Use precomputed corner weights — avoids 4× Math.hypot per pixel per frame
+      const cwBase = (y * FIELD_OFF_W + x) * 4;
+      let c1 = Math.abs(_cwCache[cwBase]   * ampEff[0]);
+      let c2 = Math.abs(_cwCache[cwBase+1] * ampEff[1]);
+      let c3 = Math.abs(_cwCache[cwBase+2] * ampEff[2]);
+      let c4 = Math.abs(_cwCache[cwBase+3] * ampEff[3]);
       const sum = Math.max(1e-6, c1 + c2 + c3 + c4); c1 /= sum; c2 /= sum; c3 /= sum; c4 /= sum;
       let r = c1 * colors01[0][0] + c2 * colors01[1][0] + c3 * colors01[2][0] + c4 * colors01[3][0];
       let g = c1 * colors01[0][1] + c2 * colors01[1][1] + c3 * colors01[2][1] + c4 * colors01[3][1];
       let b = c1 * colors01[0][2] + c2 * colors01[1][2] + c3 * colors01[2][2] + c4 * colors01[3][2];
       const mag = clamp(Math.abs(z), 0, 1); const bright = baseLift + (1 - baseLift) * (0.18 + 0.82 * mag);
       r *= bright; g *= bright; b *= bright;
-      const node = Math.exp(-Math.pow((Math.abs(z) / Math.max(1e-6, nodeWidth)), 2));
-      // At nodes: desaturate toward luminance (colour drains away) rather than flashing white
-      const nodeLum = 0.2126*r + 0.7152*g + 0.0722*b;
-      const nodeDesat = node * nodeStrength;
-      r = lerp(r, nodeLum, nodeDesat); g = lerp(g, nodeLum, nodeDesat); b = lerp(b, nodeLum, nodeDesat);
+      // Node desaturation effect — skip on Pi (saves Math.exp + Math.pow per pixel)
+      if (!_IS_ELECTRON) {
+        const node = Math.exp(-Math.pow((Math.abs(z) / Math.max(1e-6, nodeWidth)), 2));
+        const nodeLum = 0.2126*r + 0.7152*g + 0.0722*b;
+        const nodeDesat = node * nodeStrength;
+        r = lerp(r, nodeLum, nodeDesat); g = lerp(g, nodeLum, nodeDesat); b = lerp(b, nodeLum, nodeDesat);
+      }
       {
         const l = 0.2126*r + 0.7152*g + 0.0722*b;
         r = l + (r - l) * VIS_SAT; g = l + (g - l) * VIS_SAT; b = l + (b - l) * VIS_SAT;
@@ -1571,10 +1616,16 @@ function renderFieldRich(dt) {
       fieldImgData[p] = clamp(Math.floor(r * 255), 0, 255); fieldImgData[p + 1] = clamp(Math.floor(g * 255), 0, 255); fieldImgData[p + 2] = clamp(Math.floor(b * 255), 0, 255); fieldImgData[p + 3] = 255;
     }
   }
-  offFieldCtx.putImageData(img, 0, 0); fieldCtx.imageSmoothingEnabled = true; fieldCtx.drawImage(offField, 0, 0, FIELD_OFF_W, FIELD_OFF_H, 0, 0, w, h);
+  offFieldCtx.putImageData(img, 0, 0);
+  fieldCtx.imageSmoothingEnabled = true;
+  fieldCtx.imageSmoothingQuality = 'high';  // bilinear/bicubic upscale — keeps edges smooth at low source res
+  fieldCtx.drawImage(offField, 0, 0, FIELD_OFF_W, FIELD_OFF_H, 0, 0, w, h);
 }
 
   // -------- Audio monitor (AudioWorklet) --------
+  // Uses the same DacSynth worklet as DAC output so the monitor accurately
+  // previews waveform shapes, FX (fuzz, distort, phaser, flanger), and per-channel
+  // wave types. CH1/CH3 → left, CH2/CH4 → right, scaled to safe listening level.
   let envIntensity = [0,0,0,0];
   let envSlew = [0,0,0,0];
   let audio = { enabled: false, ctx: null, node: null, gain: null, lastSend: 0 };
@@ -1582,52 +1633,18 @@ function renderFieldRich(dt) {
   async function ensureAudio() {
     if (audio.ctx) return;
     const ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
-    const workletCode = `
-      class CoyoteSynth extends AudioWorkletProcessor {
-        constructor() {
-          super();
-          this.sr = sampleRate; this.phase = [0,0,0,0]; this.amp = [0,0,0,0]; this.freq = [200,200,200,200]; this.phOff = [0,0,0,0];
-          this.tAmp = [0,0,0,0]; this.tFreq = [200,200,200,200]; this.tPhOff = [0,0,0,0];
-          this.port.onmessage = (e) => {
-            const p = e.data;
-            if (!p || !p.type) return;
-            if (p.type === 'params') { this.tAmp = p.amp || this.tAmp; this.tFreq = p.freq || this.tFreq; this.tPhOff = p.phase || this.tPhOff; }
-          };
-        }
-        slew(cur, tgt, dt, tau) { tau = Math.max(1e-4, tau); const k = 1 - Math.exp(-dt / tau); return cur + (tgt - cur) * k; }
-        process(inputs, outputs) {
-          const outL = outputs[0][0]; const outR = outputs[0][1]; const n = outL.length; const dt = n / this.sr;
-          for (let i=0;i<4;i++){
-            this.amp[i] = this.slew(this.amp[i], this.tAmp[i] || 0, dt, 0.04);
-            this.freq[i] = this.slew(this.freq[i], this.tFreq[i] || 0, dt, 0.08);
-            this.phOff[i] = this.slew(this.phOff[i], this.tPhOff[i] || 0, dt, 0.10);
-          }
-          let env = [0,0,0,0];
-          for (let s=0;s<n;s++){
-            let l = 0, r = 0;
-            for (let ch=0; ch<4; ch++){
-              const f = this.freq[ch]; const inc = 2*Math.PI*f/this.sr; this.phase[ch] += inc;
-              if (this.phase[ch] > 1e6) this.phase[ch] %= (2*Math.PI);
-              const v = (this.amp[ch] || 0) * Math.sin(this.phase[ch] + (this.phOff[ch]||0));
-              env[ch] += Math.abs(v);
-              if (ch===0 || ch===2) l += v; else r += v;
-            }
-            outL[s] = l * 0.35; outR[s] = r * 0.35;
-          }
-          try { this.port.postMessage({type:'env', env: [env[0]/n, env[1]/n, env[2]/n, env[3]/n]}); } catch {}
-          return true;
-        }
-      }
-      registerProcessor('coyote-synth', CoyoteSynth);
-    `;
-    const blob = new Blob([workletCode], { type: "application/javascript" });
+    const blob = new Blob([DAC_WORKLET_CODE], { type: "application/javascript" });
     const url = URL.createObjectURL(blob);
     await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
-    const node = new AudioWorkletNode(ctx, "coyote-synth", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+    const node = new AudioWorkletNode(ctx, "dac-synth", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
+    // Route CH1/CH3 → left, CH2/CH4 → right (same as estim convention)
+    node.port.postMessage({ type: 'params',
+      amp: [0,0,0,0], freq: [200,200,200,200], phase: [0,0,0,0],
+      routeL: [1,0,1,0], routeR: [0,1,0,1],
+      level: 0.35, waveTypes: [0,0,0,0], fx: [[],[],[],[]] });
     const gain = ctx.createGain(); gain.gain.value = 0.0;
     node.connect(gain).connect(ctx.destination);
     audio.ctx = ctx; audio.node = node; audio.gain = gain;
-    try { node.port.onmessage = (e) => { const d = e.data; if (d && d.type === 'env' && Array.isArray(d.env)) { for (let i=0;i<4;i++) envIntensity[i] = clamp(d.env[i]||0, 0, 1); } }; } catch {}
   }
 
   async function setMonitorEnabled(on) {
@@ -1638,7 +1655,33 @@ function renderFieldRich(dt) {
   }
 
   function buildAudioParamMessage() {
-    return { type: 'params', amp: [applied.ampEff[0], applied.ampEff[1], applied.ampEff[2], applied.ampEff[3]], freq: [applied.freqHz[0], applied.freqHz[1], applied.freqHz[2], applied.freqHz[3]], phase: [applied.phaseRad[0], applied.phaseRad[1], applied.phaseRad[2], applied.phaseRad[3]] };
+    // Send the same waveType + FX state to the monitor as to the DAC outputs
+    let chWaves, chFx;
+    if (APP_MODE === "synth" && window.SynthEngine) {
+      if (typeof window.SynthEngine.getChannelWaveTypes === "function") chWaves = window.SynthEngine.getChannelWaveTypes();
+      if (typeof window.SynthEngine.getChannelFxState === "function") chFx = window.SynthEngine.getChannelFxState();
+    } else if (APP_MODE === "biome" && window.BiomeEngine && typeof window.BiomeEngine.getAudioOutputs === "function") {
+      const bio = window.BiomeEngine.getAudioOutputs();
+      chWaves = (bio && bio.waveTypes) ? bio.waveTypes : null;
+      chFx = (bio && bio.fx) ? bio.fx : null;
+    }
+    if (!chWaves) chWaves = [
+      parseInt($("dacWaveCH1")?.value || "0", 10),
+      parseInt($("dacWaveCH2")?.value || "0", 10),
+      parseInt($("dacWaveCH3")?.value || "0", 10),
+      parseInt($("dacWaveCH4")?.value || "0", 10),
+    ];
+    if (!chFx) chFx = [[], [], [], []];
+    return {
+      type: 'params',
+      amp: [applied.ampEff[0], applied.ampEff[1], applied.ampEff[2], applied.ampEff[3]],
+      freq: [applied.freqHz[0], applied.freqHz[1], applied.freqHz[2], applied.freqHz[3]],
+      phase: [applied.phaseRad[0], applied.phaseRad[1], applied.phaseRad[2], applied.phaseRad[3]],
+      routeL: [1,0,1,0], routeR: [0,1,0,1],
+      level: 0.35,
+      waveTypes: chWaves,
+      fx: chFx
+    };
   }
 
   // -------- DAC Audio Output --------
@@ -1657,11 +1700,16 @@ class DacSynth extends AudioWorkletProcessor {
     this.amp   = [0,0,0,0]; this.tAmp  = [0,0,0,0];
     this.freq  = [200,200,200,200]; this.tFreq = [200,200,200,200];
     this.phOff = [0,0,0,0]; this.tPhOff = [0,0,0,0];
-    // routeL/R: 0 or 1 per channel — contribution to left/right output
     this.routeL = [1,0,1,0];
     this.routeR = [0,1,0,1];
     this.level = 1.0;
-    this.waveType = 0; // 0=sine, 1=triangle, 2=square
+    this.waveType = 0;
+    this.waveTypes = [0,0,0,0];
+    // Per-channel audio-rate FX: array of 4 arrays, each containing {id, params}
+    this.fx = [[], [], [], []];         // target FX state (from messages)
+    this.fxSmooth = [[], [], [], []];   // smoothed FX state (used for rendering)
+    // Phaser/flanger internal state per channel per effect slot
+    this.fxState = [{}, {}, {}, {}];
     this.port.onmessage = (e) => {
       const p = e.data;
       if (!p || !p.type) return;
@@ -1673,6 +1721,8 @@ class DacSynth extends AudioWorkletProcessor {
         if (p.routeR != null) this.routeR = p.routeR;
         if (p.level  != null) this.level  = p.level;
         if (p.waveType != null) this.waveType = p.waveType;
+        if (p.waveTypes != null) this.waveTypes = p.waveTypes;
+        if (p.fx != null) this.fx = p.fx;
       }
     };
   }
@@ -1680,9 +1730,159 @@ class DacSynth extends AudioWorkletProcessor {
   wave(ph, type) {
     const TAU = 6.283185307;
     const p = ((ph % TAU) + TAU) % TAU;
-    if (type === 1) { const u = p / TAU; return u < 0.5 ? 4*u - 1 : 3 - 4*u; }   // triangle
-    if (type === 2) { return p < 3.14159265 ? 1 : -1; }                            // square
-    return Math.sin(ph);                                                            // sine
+    if (type === 1) { const u = p / TAU; return u < 0.5 ? 4*u - 1 : 3 - 4*u; }
+    if (type === 2) { return p < 3.14159265 ? 1 : -1; }
+    return Math.sin(ph);
+  }
+  // Audio-rate FX: guitar-pedal-style waveform transformations.
+  // These operate on the raw audio waveform at sample rate, producing
+  // clearly audible timbral changes — not just volume modulation.
+  applyFx(v, ch, sampleIdx) {
+    const fxList = this.fxSmooth[ch];
+    if (!fxList || fxList.length === 0) return v;
+    const st = this.fxState[ch];
+    for (let fi = 0; fi < fxList.length; fi++) {
+      const fx = fxList[fi];
+      const key = fx.id + fi;
+      switch (fx.id) {
+
+        case 'echo': {
+          // Audio-rate echo: real delay line with feedback.
+          // Gates by channel amplitude so echo drains when volume goes to zero.
+          const maxDelay = Math.round(this.sr * 1.5);
+          if (!st[key]) { st[key] = { buf: new Float32Array(Math.min(maxDelay, 72000)), pos: 0 }; }
+          const s = st[key];
+          const delay = Math.min(1.5, Math.max(0.02, fx.params.delay || 0.3));
+          const fb = Math.min(0.95, Math.max(0, fx.params.feedback || 0.45));
+          const mix = Math.min(1, Math.max(0, fx.params.mix || 0.5));
+          const delaySamples = Math.max(1, Math.round(delay * this.sr));
+          const readPos = (s.pos - delaySamples + s.buf.length) % s.buf.length;
+          const delayed = s.buf[readPos];
+          s.buf[s.pos] = v + delayed * fb;
+          s.pos = (s.pos + 1) % s.buf.length;
+          v = v + delayed * mix;
+          break;
+        }
+
+        case 'fuzz': {
+          // Fuzz pedal: asymmetric clipping + octave-up rectification.
+          // Classic fuzz boxes (Fuzz Face, Big Muff) use germanium/silicon
+          // transistor stages that clip asymmetrically and add even+odd harmonics.
+          const drive = Math.max(1, fx.params.drive || 2);
+          const mix = Math.min(1, Math.max(0, fx.params.mix != null ? fx.params.mix : 0.7));
+          const boosted = v * drive * 3;
+          // Stage 1: asymmetric soft-clip (positive clips harder than negative)
+          const pos = boosted > 0 ? Math.tanh(boosted * 1.5) : Math.tanh(boosted * 0.8) * 1.2;
+          // Stage 2: octave-up fuzz via full-wave rectification blended in
+          const rectified = Math.abs(pos);
+          const fuzzed = pos * 0.6 + rectified * 0.4;
+          // Normalize back down
+          const normed = fuzzed / Math.max(1, drive * 1.2);
+          v = v * (1 - mix) + normed * mix;
+          break;
+        }
+
+        case 'distort': {
+          // Distortion pedal: hard-clip with multiple gain stages.
+          // Like a ProCo RAT or Boss DS-1 — cascaded clipping stages
+          // that progressively square off the waveform.
+          const drive = Math.max(1, fx.params.drive || 4);
+          const mix = Math.min(1, Math.max(0, fx.params.mix != null ? fx.params.mix : 0.5));
+          let d = v * drive * 4;
+          // Stage 1: soft knee into hard clip
+          if (d > 0.3) d = 0.3 + (d - 0.3) * 0.4;
+          if (d < -0.3) d = -0.3 + (d + 0.3) * 0.4;
+          // Stage 2: hard clip
+          d = d > 1 ? 1 : (d < -1 ? -1 : d);
+          // Stage 3: second hard clip with more gain (cascaded)
+          d = d * drive * 0.5;
+          d = d > 1 ? 1 : (d < -1 ? -1 : d);
+          v = v * (1 - mix) + d * mix;
+          break;
+        }
+
+        case 'phaser': {
+          // Phaser pedal: 4-stage all-pass filter cascade with feedback.
+          // Like a Phase 90 or Small Stone — sweeps deep notches through
+          // the harmonic series creating that iconic jet-plane swoosh.
+          if (!st[key]) st[key] = { ph: 0, ap: [0,0,0,0], xp: [0,0,0,0] };
+          const s = st[key];
+          const rate = fx.params.rate || 0.4;
+          const depth = Math.min(1, Math.max(0, fx.params.depth || 0.6));
+          s.ph += rate / this.sr * 6.283185307;
+          const lfo = Math.sin(s.ph);
+          // Sweep coefficient across a wide range for deep effect
+          const minF = 200 / this.sr, maxF = 4000 / this.sr;
+          const f = minF + (maxF - minF) * (0.5 + 0.5 * lfo * depth);
+          const c = (1 - f) / (1 + f); // all-pass coefficient
+          // 4-stage all-pass cascade (each stage adds a notch)
+          let x = v;
+          for (let i = 0; i < 4; i++) {
+            const xn = x;
+            x = c * (xn - s.ap[i]) + s.xp[i];
+            s.xp[i] = xn;
+            s.ap[i] = x;
+          }
+          // Mix dry + wet with feedback for resonance
+          v = v + x * depth;
+          break;
+        }
+
+        case 'flanger': {
+          // Flanger pedal: through-zero capable comb filter.
+          // Like an Electric Mistress or BF-2 — modulated short delay
+          // creates metallic swooshing and jet-plane effects.
+          if (!st[key]) { st[key] = { ph: 0, buf: new Float32Array(4096), pos: 0 }; }
+          const s = st[key];
+          const rate = fx.params.rate || 0.2;
+          const depth = Math.min(1, Math.max(0, fx.params.depth || 0.5));
+          const fb = Math.min(0.95, Math.max(0, fx.params.feedback || 0.3));
+          s.ph += rate / this.sr * 6.283185307;
+          const lfo = 0.5 + 0.5 * Math.sin(s.ph);
+          // Sweep delay 0.1ms to 10ms — wider range for more dramatic effect
+          const delaySamples = 1 + lfo * depth * this.sr * 0.01;
+          const intDelay = Math.floor(delaySamples);
+          const frac = delaySamples - intDelay;
+          // Linear interpolation for smooth delay sweep (avoids zipper noise)
+          const p1 = (s.pos - intDelay + s.buf.length) % s.buf.length;
+          const p2 = (s.pos - intDelay - 1 + s.buf.length) % s.buf.length;
+          const delayed = s.buf[p1] * (1 - frac) + s.buf[p2] * frac;
+          // Write with feedback — high feedback creates resonant metallic tone
+          s.buf[s.pos] = v + delayed * fb;
+          s.pos = (s.pos + 1) % s.buf.length;
+          // Full wet/dry mix (not 50/50 — let the comb filter dominate)
+          v = v * 0.6 + delayed * 0.8;
+          break;
+        }
+      }
+    }
+    return v;
+  }
+  // Smoothly interpolate FX params toward target values (called once per process block).
+  // Prevents pops/clicks when FX params change between frames.
+  slewFx(dt) {
+    const tau = 0.12; // ~120ms smoothing — fast enough to feel responsive, slow enough to avoid clicks
+    for (let ch = 0; ch < 4; ch++) {
+      const target = this.fx[ch] || [];
+      const smooth = this.fxSmooth[ch] || [];
+      // Match structure: ensure smoothed array has same effects as target
+      while (smooth.length < target.length) smooth.push({ id: target[smooth.length].id, params: {} });
+      // Shrink if target lost effects (fade params to 0 first handled by natural decay)
+      smooth.length = target.length;
+      for (let fi = 0; fi < target.length; fi++) {
+        smooth[fi].id = target[fi].id;
+        if (!smooth[fi].params) smooth[fi].params = {};
+        const tp = target[fi].params || {};
+        const sp = smooth[fi].params;
+        // Slew each numeric param
+        for (const key of Object.keys(tp)) {
+          const tv = tp[key] || 0;
+          const sv = sp[key] != null ? sp[key] : tv; // init to target if new
+          sp[key] = sv + (tv - sv) * (1 - Math.exp(-dt / tau));
+        }
+      }
+      this.fxSmooth[ch] = smooth;
+    }
   }
   process(inputs, outputs) {
     const outL = outputs[0][0], outR = outputs[0][1];
@@ -1692,14 +1892,22 @@ class DacSynth extends AudioWorkletProcessor {
       this.freq[i]  = this.slew(this.freq[i],  this.tFreq[i]  || 200, dt, 0.08);
       this.phOff[i] = this.slew(this.phOff[i], this.tPhOff[i] || 0,   dt, 0.10);
     }
-    const wt = this.waveType, lv = this.level;
+    // Smooth FX params once per block (not per sample — too expensive)
+    this.slewFx(dt);
+    const wt = this.waveType, wts = this.waveTypes, lv = this.level;
     const TAU = 6.283185307;
     for (let s = 0; s < n; s++) {
       let l = 0, r = 0;
       for (let ch = 0; ch < 4; ch++) {
         this.phase[ch] += TAU * this.freq[ch] / this.sr;
         if (this.phase[ch] > 1e6) this.phase[ch] %= TAU;
-        const v = (this.amp[ch] || 0) * this.wave(this.phase[ch] + (this.phOff[ch] || 0), wt);
+        const cwt = (wts && wts[ch] != null) ? wts[ch] : wt;
+        // Generate waveform at unit level, apply FX, THEN multiply by volume.
+        // This ensures volume/stop is always the final gate — echo buffers can't
+        // leak audio after the channel is silenced.
+        let v = this.wave(this.phase[ch] + (this.phOff[ch] || 0), cwt);
+        v = this.applyFx(v, ch, s);
+        v *= (this.amp[ch] || 0);
         l += v * this.routeL[ch];
         r += v * this.routeR[ch];
       }
@@ -1774,7 +1982,22 @@ registerProcessor('dac-synth', DacSynth);
   function buildDacParamMessage() {
     const routeL = [1,2,3,4].map(i => $(`dacL${i}`)?.checked ? 1 : 0);
     const routeR = [1,2,3,4].map(i => $(`dacR${i}`)?.checked ? 1 : 0);
-    const waveType = parseInt($("dacWaveform")?.value || "0", 10);
+    let chWaves, chFx;
+    if (APP_MODE === "synth" && window.SynthEngine) {
+      if (typeof window.SynthEngine.getChannelWaveTypes === "function") chWaves = window.SynthEngine.getChannelWaveTypes();
+      if (typeof window.SynthEngine.getChannelFxState === "function") chFx = window.SynthEngine.getChannelFxState();
+    } else if (APP_MODE === "biome" && window.BiomeEngine && typeof window.BiomeEngine.getAudioOutputs === "function") {
+      const bio = window.BiomeEngine.getAudioOutputs();
+      chWaves = (bio && bio.waveTypes) ? bio.waveTypes : null;
+      chFx = (bio && bio.fx) ? bio.fx : null;
+    }
+    if (!chWaves) chWaves = [
+      parseInt($("dacWaveCH1")?.value || "0", 10),
+      parseInt($("dacWaveCH2")?.value || "0", 10),
+      parseInt($("dacWaveCH3")?.value || "0", 10),
+      parseInt($("dacWaveCH4")?.value || "0", 10),
+    ];
+    if (!chFx) chFx = [[], [], [], []];
     return {
       type: 'params',
       amp:     [sdAmp(0), sdAmp(1), sdAmp(2), sdAmp(3)],
@@ -1782,7 +2005,8 @@ registerProcessor('dac-synth', DacSynth);
       phase:   [...applied.phaseRad],
       routeL, routeR,
       level: 1.0,
-      waveType
+      waveTypes: chWaves,
+      fx: chFx
     };
   }
 
@@ -1839,7 +2063,7 @@ registerProcessor('dac-synth', DacSynth);
         amp: [0,0,0,0], freq: [200,200,200,200], phase: [0,0,0,0],
         routeL: isSecondary ? [0,0,1,0] : [1,0,0,0],
         routeR: isSecondary ? [0,0,0,1] : [0,1,0,0],
-        level: 1.0, waveType: 0 });
+        level: 1.0, waveTypes: [0,0,0,0] });
       updateBtStatus();
       updatePhaseUIState();
       updateDacSettingsPanel();
@@ -2313,8 +2537,23 @@ function compileExpr(expr) {
     if (dac.enabled && dac.node && dac.ctx && now - dac.lastSend > 16) { dac.lastSend = now; dac.node.port.postMessage(buildDacParamMessage()); }
     // Per-slot DAC outputs — primary (CH1→L, CH2→R) and secondary (CH3→L, CH4→R)
     {
-      const pWave = parseInt($("primaryDacWaveform")?.value   || "0", 10);
-      const sWave = parseInt($("secondaryDacWaveform")?.value || "0", 10);
+      // Per-channel waveTypes and audio-rate FX state
+      let chWaves, chFx;
+      if (APP_MODE === "synth" && window.SynthEngine) {
+        if (typeof window.SynthEngine.getChannelWaveTypes === "function") chWaves = window.SynthEngine.getChannelWaveTypes();
+        if (typeof window.SynthEngine.getChannelFxState === "function") chFx = window.SynthEngine.getChannelFxState();
+      } else if (APP_MODE === "biome" && window.BiomeEngine && typeof window.BiomeEngine.getAudioOutputs === "function") {
+        const bio = window.BiomeEngine.getAudioOutputs();
+        chWaves = (bio && bio.waveTypes) ? bio.waveTypes : [0,0,0,0];
+        chFx = (bio && bio.fx) ? bio.fx : [[], [], [], []];
+      }
+      if (!chWaves) chWaves = [
+        parseInt($("dacWaveCH1")?.value || "0", 10),
+        parseInt($("dacWaveCH2")?.value || "0", 10),
+        parseInt($("dacWaveCH3")?.value || "0", 10),
+        parseInt($("dacWaveCH4")?.value || "0", 10),
+      ];
+      if (!chFx) chFx = [[], [], [], []];
       const pSlot = slotDac.primary;
       if (pSlot.ctx && pSlot.node && now - pSlot.lastSend > 16) {
         pSlot.lastSend = now;
@@ -2323,7 +2562,7 @@ function compileExpr(expr) {
           freq:   [applied.freqHz[0],  applied.freqHz[1],  200, 200],
           phase:  [applied.phaseRad[0],applied.phaseRad[1],0, 0],
           routeL: [1, 0, 0, 0], routeR: [0, 1, 0, 0],
-          level: 1.0, waveType: pWave });
+          level: 1.0, waveTypes: chWaves, fx: chFx });
       }
       const sSlot = slotDac.secondary;
       if (sSlot.ctx && sSlot.node && now - sSlot.lastSend > 16) {
@@ -2333,7 +2572,7 @@ function compileExpr(expr) {
           freq:   [200, 200, applied.freqHz[2],  applied.freqHz[3]],
           phase:  [0, 0, applied.phaseRad[2], applied.phaseRad[3]],
           routeL: [0, 0, 1, 0], routeR: [0, 0, 0, 1],
-          level: 1.0, waveType: sWave });
+          level: 1.0, waveTypes: chWaves, fx: chFx });
       }
     }
     btTick(nowSec);
@@ -2342,16 +2581,31 @@ function compileExpr(expr) {
   function renderTick() {
     const now = performance.now(); const dt = clamp((now - lastRenderT) / 1000, 0, 0.05); lastRenderT = now;
     if (APP_MODE === "biome") {
-      if (window.BiomeEngine) { window.BiomeEngine.render(dt); drawSpectrum(); }
+      // On Pi/Electron: cap biome at 20fps — radial-gradient splats are the main audio-crunch culprit
+      if (window.BiomeEngine && now - _biomeLastT >= _BIOME_FRAME_MS) {
+        _biomeLastT = now;
+        window.BiomeEngine.render(dt); drawSpectrum();
+      }
     } else if (APP_MODE === "synth") {
-      // Full oscilloscope trace display on scope canvas
-      if (window.SynthEngine) window.SynthEngine.renderSlitScan(scopeCanvas);
+      // On Pi/Electron: cap synth slit-scan at 30fps to reduce main-thread pressure
+      if (now - _synthLastT >= _SYNTH_FRAME_MS) {
+        _synthLastT = now;
+        if (window.SynthEngine) window.SynthEngine.renderSlitScan(scopeCanvas);
+      }
       // Touch canvas is hidden in synth mode — skip wave field computation
     } else {
-      drawScope();
+      // On Pi/Electron: cap scope at 30fps (saves 4×800 Math.sin/frame at full rAF rate)
+      if (now - _scopeLastT >= _SCOPE_FRAME_MS) {
+        _scopeLastT = now;
+        drawScope();
+      }
       strobePhase = (strobePhase + TAU * FIELD_DRIFT_HZ * dt) % TAU;
-      computeField(true, dt);
-      renderFieldRich(dt);
+      // On Pi/Electron: cap field at 30fps to save CPU
+      if (now - _fieldLastT >= _FIELD_FRAME_MS) {
+        _fieldLastT = now;
+        computeField(true, dt);
+        renderFieldRich(dt);
+      }
     }
     requestAnimationFrame(renderTick);
   }
@@ -2360,6 +2614,9 @@ function compileExpr(expr) {
   (async function boot() {
     const saved = loadSettings(); if (saved) applySettings(saved); if (masterVol) masterVol.value = "0";
     updateValueTexts(); updateMaxPills(); initSnapButtons();
+    // On Pi/Electron: apply a CSS blur to fieldCanvas — handled by the GPU compositor,
+    // zero JS cost, hides the low-res pixelation and gives a smooth glowing look.
+    if (_IS_ELECTRON && fieldCanvas) fieldCanvas.style.filter = 'blur(4px)';
     try {
       const ci = $("caretakerIntensity");
       if (ci && !ci.dataset.bound) {

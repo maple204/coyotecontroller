@@ -14,11 +14,11 @@ const SynthEngine = (() => {
   // ── Channel colours (match main.js) ────────────────────────────────────────
   const CH_COLORS = [
     { r:   0, g: 170, b: 255 },   // CH1 blue
-    { r: 255, g:  80, b:  80 },   // CH2 red
-    { r:  80, g: 255, b: 140 },   // CH3 green
-    { r: 255, g: 210, b:  80 },   // CH4 yellow
+    { r: 255, g: 210, b:  80 },   // CH2 yellow
+    { r: 255, g:  80, b:  80 },   // CH3 red
+    { r:  80, g: 255, b: 140 },   // CH4 green
   ];
-  const CH_CSS   = ['#0af', '#f50', '#5fa', '#fd0'];
+  const CH_CSS   = ['#0af', '#fd0', '#f50', '#5fa'];
   const CH_NAMES = ['CH1', 'CH2', 'CH3', 'CH4'];
 
   // ── Modifier definitions ─────────────────────────────────────────────────
@@ -198,6 +198,7 @@ const SynthEngine = (() => {
       _buf: null, _pos: 0, _ph: 0,
     })),
     fxOpen: false,
+    waveType: 0, // 0=sine, 1=triangle, 2=square (per-channel)
   }));
 
   // Slit-scan: shared circular buffer, one row per channel
@@ -348,8 +349,12 @@ const SynthEngine = (() => {
         const delaySamp = Math.max(1, Math.round((p.delay || 0.3) * ECHO_RATE));
         const readPos   = (eff._pos - delaySamp + bufLen) % bufLen;
         const delayed   = eff._buf[readPos];
-        const out = clamp(ampIn + delayed * (p.mix || 0.5), 0, 1);
-        eff._buf[eff._pos] = ampIn + delayed * clamp(p.feedback || 0.45, 0, 0.95);
+        const fb = clamp(p.feedback || 0.45, 0, 0.95);
+        const mix = p.mix || 0.5;
+        // Standard delay line: delayed signal plays back during quiet moments
+        // (that's the whole point of echo — ghost repeats when the source is silent)
+        const out = clamp(ampIn + delayed * mix, 0, 1);
+        eff._buf[eff._pos] = ampIn + delayed * fb;
         eff._pos = (eff._pos + 1) % bufLen;
         return { amp: out, freq: freqIn };
       }
@@ -465,9 +470,13 @@ const SynthEngine = (() => {
       }
       amp = clamp(amp, 0, 1);
 
-      // Apply effects chain
+      // Apply effects chain (control-rate).
+      // Echo is skipped here — it runs at audio rate in the DAC worklet where it
+      // produces real waveform repeats. Running it here too would keep amplitude
+      // alive after the channel volume goes to zero (echo feedback → amp > 0 →
+      // worklet thinks channel is active → audio never stops).
       for (const eff of chain.effects) {
-        if (!eff.enabled) continue;
+        if (!eff.enabled || eff.defId === 'echo') continue;
         const out = processEffect(eff, amp, freq, dt);
         amp  = out.amp;
         freq = out.freq;
@@ -961,9 +970,25 @@ const SynthEngine = (() => {
         if (rack) rack.style.display = chain.fxOpen ? 'flex' : 'none';
       });
 
+      // Per-channel waveform selector
+      const waveSelect = document.createElement('select');
+      waveSelect.className = 'synth-wave-select';
+      waveSelect.title     = 'DAC waveform for this channel';
+      [{v:0,l:'Sine'},{v:1,l:'Tri'},{v:2,l:'Sq'}].forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.v; opt.textContent = o.l;
+        if (chain.waveType === o.v) opt.selected = true;
+        waveSelect.appendChild(opt);
+      });
+      waveSelect.addEventListener('change', () => {
+        chain.waveType = parseInt(waveSelect.value, 10);
+        saveToStorage();
+      });
+
       header.appendChild(chLabel);
       header.appendChild(addBtn);
       header.appendChild(fxBtn);
+      header.appendChild(waveSelect);
       lane.appendChild(header);
 
       // Modifier drop-zone
@@ -990,44 +1015,87 @@ const SynthEngine = (() => {
       });
       lane.appendChild(modsRow);
 
-      // Effects rack
+      // Effects rack (drag-reorderable)
       const fxRack = document.createElement('div');
       fxRack.className    = 'synth-fx-rack';
       fxRack.style.display = chain.fxOpen ? 'flex' : 'none';
 
-      chain.effects.forEach((eff, ei) => {
-        const effDef  = EFFECT_DEFS[ei];
-        const effChip = document.createElement('div');
-        effChip.className     = 'synth-fx-chip' + (eff.enabled ? ' active' : '');
-        effChip.dataset.ch    = ch;
-        effChip.dataset.ei    = ei;
-        effChip.style.setProperty('--fx-color', effDef.color);
+      function buildFxChips(rack, chIdx) {
+        rack.innerHTML = '';
+        const chain = _chains[chIdx];
+        chain.effects.forEach((eff, ei) => {
+          const effDef = EFFECT_DEFS.find(d => d.id === eff.defId) || EFFECT_DEFS[0];
+          const effChip = document.createElement('div');
+          effChip.className     = 'synth-fx-chip' + (eff.enabled ? ' active' : '');
+          effChip.dataset.ch    = chIdx;
+          effChip.dataset.ei    = ei;
+          effChip.draggable     = true;
+          effChip.style.setProperty('--fx-color', effDef.color);
 
-        const effLabel = document.createElement('span');
-        effLabel.textContent = effDef.label;
+          const effLabel = document.createElement('span');
+          effLabel.textContent = effDef.label;
 
-        const effToggle = document.createElement('button');
-        effToggle.className   = 'synth-fx-toggle';
-        effToggle.textContent = eff.enabled ? 'ON' : 'OFF';
-        effToggle.addEventListener('click', (e) => {
-          e.stopPropagation();
-          eff.enabled = !eff.enabled;
-          effChip.classList.toggle('active', eff.enabled);
+          const effToggle = document.createElement('button');
+          effToggle.className   = 'synth-fx-toggle';
           effToggle.textContent = eff.enabled ? 'ON' : 'OFF';
-          saveToStorage();
+          effToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            eff.enabled = !eff.enabled;
+            effChip.classList.toggle('active', eff.enabled);
+            effToggle.textContent = eff.enabled ? 'ON' : 'OFF';
+            saveToStorage();
+          });
+
+          effChip.appendChild(effLabel);
+          effChip.appendChild(effToggle);
+
+          const capturedEi = ei;
+          effChip.addEventListener('click', (e) => {
+            if (e.target === effToggle) return;
+            // Find current index (may have changed due to reorder)
+            const curIdx = chain.effects.indexOf(eff);
+            openParamPopup(chIdx, curIdx >= 0 ? curIdx : capturedEi, 'effect', effChip);
+          });
+
+          // Drag reorder handlers
+          effChip.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', `fx:${chIdx}:${ei}`);
+            e.dataTransfer.effectAllowed = 'move';
+            effChip.classList.add('dragging');
+          });
+          effChip.addEventListener('dragend', () => {
+            effChip.classList.remove('dragging');
+          });
+          effChip.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            effChip.classList.add('fx-drop-target');
+          });
+          effChip.addEventListener('dragleave', () => {
+            effChip.classList.remove('fx-drop-target');
+          });
+          effChip.addEventListener('drop', (e) => {
+            e.preventDefault();
+            effChip.classList.remove('fx-drop-target');
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data.startsWith('fx:')) return;
+            const [, srcChStr, srcIdxStr] = data.split(':');
+            const srcCh = parseInt(srcChStr, 10);
+            const srcIdx = parseInt(srcIdxStr, 10);
+            if (srcCh !== chIdx) return; // only reorder within same channel
+            const targetIdx = chain.effects.indexOf(eff);
+            if (srcIdx === targetIdx || srcIdx < 0 || targetIdx < 0) return;
+            // Move effect from srcIdx to targetIdx
+            const [moved] = chain.effects.splice(srcIdx, 1);
+            chain.effects.splice(targetIdx, 0, moved);
+            buildFxChips(rack, chIdx);
+            saveToStorage();
+          });
+
+          rack.appendChild(effChip);
         });
-
-        effChip.appendChild(effLabel);
-        effChip.appendChild(effToggle);
-
-        const capturedEi = ei;
-        effChip.addEventListener('click', (e) => {
-          if (e.target === effToggle) return;
-          openParamPopup(ch, capturedEi, 'effect', effChip);
-        });
-
-        fxRack.appendChild(effChip);
-      });
+      }
+      buildFxChips(fxRack, ch);
 
       lane.appendChild(fxRack);
       lanesEl.appendChild(lane);
@@ -1216,6 +1284,7 @@ const SynthEngine = (() => {
       modifiers: ch.modifiers.map(m => ({ defId: m.defId, params: { ...m.params }, enabled: m.enabled })),
       effects:   ch.effects.map(e => ({ defId: e.defId, params: { ...e.params }, enabled: e.enabled })),
       fxOpen:    ch.fxOpen,
+      waveType:  ch.waveType || 0,
     }));
   }
 
@@ -1231,11 +1300,24 @@ const SynthEngine = (() => {
         _phase: 0,
         _state: null,
       }));
-      for (const saved of (src.effects || [])) {
+      // Restore effects: apply saved params/enabled AND reorder to match saved order
+      const savedEffects = src.effects || [];
+      for (const saved of savedEffects) {
         const eff = _chains[ch].effects.find(e => e.defId === saved.defId);
         if (eff) { eff.params = { ...saved.params }; eff.enabled = !!saved.enabled; }
       }
+      // If saved arrangement has an explicit order, reorder effects to match
+      if (savedEffects.length > 0 && savedEffects[0].defId) {
+        const orderMap = {};
+        savedEffects.forEach((s, i) => { orderMap[s.defId] = i; });
+        _chains[ch].effects.sort((a, b) => {
+          const ai = orderMap[a.defId] != null ? orderMap[a.defId] : 999;
+          const bi = orderMap[b.defId] != null ? orderMap[b.defId] : 999;
+          return ai - bi;
+        });
+      }
       _chains[ch].fxOpen = !!src.fxOpen;
+      if (src.waveType != null) _chains[ch].waveType = src.waveType;
     }
   }
 
@@ -1281,6 +1363,27 @@ const SynthEngine = (() => {
     // Returns per-channel smoothed amplitude history (last written value, 0..1).
     getChannelAmp(ch) {
       return _hist[ch][_histPos] || 0;
+    },
+
+    // Returns per-channel waveType array [ch0, ch1, ch2, ch3] (0=sine, 1=tri, 2=square).
+    getChannelWaveTypes() {
+      return _chains.map(ch => ch.waveType || 0);
+    },
+
+    // Returns per-channel audio-rate FX state for the DAC worklet.
+    // Only includes effects that shape the waveform (fuzz, distort, phaser, flanger).
+    // Order matters — returned in chain order so the worklet applies them in sequence.
+    getChannelFxState() {
+      return _chains.map(ch => {
+        const fxList = [];
+        for (const eff of ch.effects) {
+          if (!eff.enabled) continue;
+          if (eff.defId === 'echo' || eff.defId === 'fuzz' || eff.defId === 'distort' || eff.defId === 'phaser' || eff.defId === 'flanger') {
+            fxList.push({ id: eff.defId, params: { ...eff.params } });
+          }
+        }
+        return fxList;
+      });
     },
   };
 
