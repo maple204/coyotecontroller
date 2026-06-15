@@ -1,4 +1,4 @@
-Download the Coyote Controller.zip file to you mac.
+Download the Coyote Controller.zip file to your mac.
 
 Unzip it and it will be "Coyote Controller.app" and drop that in your apps directory
 
